@@ -11,9 +11,8 @@ import org.elasticsearch.index.engine.VersionConflictEngineException;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.node.NodeBuilder;
 
-import com.google.gson.Gson;
-
 import de.olafklischat.esmapper.Entity;
+import de.olafklischat.esmapper.json.JsonConverter;
 
 public class EntityPersister<EntityType extends Entity> {
 
@@ -128,13 +127,14 @@ public class EntityPersister<EntityType extends Entity> {
     }
     
     private String toJSON(EntityType entity) {
-        Gson gson = new Gson();
-        return gson.toJson(entity);  //TODO: ignore id, version, handle associations...
+        JsonConverter jsc = new JsonConverter();
+        return jsc.toJson(entity);
     }
     
     private EntityType fromJSON(String json) {
-        Gson gson = new Gson();
-        return gson.fromJson(json, entityType);  //TODO: handle associations...
+        JsonConverter jsc = new JsonConverter();
+        return (EntityType) jsc.fromJson(json);
+        //return jsc.fromJson(json, entityType);
     }
 
 }
