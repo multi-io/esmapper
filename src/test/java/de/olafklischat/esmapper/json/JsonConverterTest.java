@@ -1,6 +1,7 @@
 package de.olafklischat.esmapper.json;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
 
 import java.util.Arrays;
 import java.util.LinkedHashMap;
@@ -12,7 +13,6 @@ import org.junit.Test;
 
 import com.google.common.primitives.Ints;
 import com.google.gson.JsonArray;
-import com.google.gson.JsonNull;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -62,7 +62,8 @@ public class JsonConverterTest {
     @Test
     public void testWriteJsonObject() throws Exception {
         JsonConverter c = new JsonConverter();
-        TestProduct p = new TestProduct("Coke", 299, new String[]{"milk","sugar"}, null);
+        TestOrg o = new TestOrg("Coca Cola Company", 125000, 3000);
+        TestProduct p = new TestProduct("Coke", 299, new String[]{"milk","sugar"}, o);
         JsonObject jso = c.toJsonElement(p).getAsJsonObject();
         JsonObject jso2 = new JsonParser().parse(c.toJson(p)).getAsJsonObject();
         assertEquals(jso2, jso);
@@ -75,10 +76,31 @@ public class JsonConverterTest {
         for (int i = 0; i < pIngs.length; i++) {
             assertEquals(pIngs[i], jsIngs.get(i).getAsString());
         }
-        assertEquals(JsonNull.INSTANCE, jso.get("producer"));
         assertEquals(p.getClass().getCanonicalName(), jso.get("_class").getAsString());
         assertEquals(5, jso.entrySet().size()); //name,price,ingredients,producer,_class
+
+        JsonObject oJso = jso.get("producer").getAsJsonObject();
+
+        assertEquals(o.getName(), oJso.get("name").getAsString());
+        assertEquals(o.getNrOfEmployees(), oJso.get("nrOfEmployees").getAsInt());
+        assertEquals(o.getRevenue(), oJso.get("revenue").getAsInt());
+        assertEquals(4, oJso.entrySet().size()); //name,nrOfEmployees,revenue,_class
     }
+    
+    
+    @Test
+    public void testReadJsonPrimitives() {
+        JsonConverter c = new JsonConverter();
+        assertEquals(42, c.fromJson("42"));
+        assertEquals(-4223, c.fromJson("-4223"));
+        assertEquals(0, c.fromJson("0"));
+        assertEquals(3.14, c.fromJson("3.14"));
+        assertEquals("Hello World", c.fromJson("\"Hello World\""));
+        assertEquals(true, c.fromJson("true"));
+        assertEquals(false, c.fromJson("false"));
+        assertNull(c.fromJson("null"));
+    }
+    
 
 }
 

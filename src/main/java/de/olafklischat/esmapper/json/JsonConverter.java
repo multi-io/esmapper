@@ -4,6 +4,8 @@ import java.beans.BeanInfo;
 import java.beans.Introspector;
 import java.beans.PropertyDescriptor;
 import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.reflect.Array;
@@ -11,20 +13,20 @@ import java.lang.reflect.Method;
 import java.util.Collection;
 import java.util.Map;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
+import com.google.gson.internal.bind.JsonTreeReader;
 import com.google.gson.internal.bind.JsonTreeWriter;
+import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 
 public class JsonConverter {
 
-    private Gson gson = new Gson();
-    
-    //write the object mapper/unmapper manually on top of Gson's low-level JSON streaming API
-    // Gson's own object mapper is too unflexible
+    //implement our own object mapper/unmapper on top of Gson's low-level JSON streaming API
+    // Gson's object mapper doesn't support everything we need
 
+    
+    //// Serialization (Object->JSON)
+    
     public String toJson(Object src) {
         StringWriter out = new StringWriter(300);
         try {
@@ -118,29 +120,67 @@ public class JsonConverter {
         }
     }
 
-    /**
-     * Determines the class from required _class property in the JSON source.
-     * TODO rewrite
-     * 
-     * @param json
-     * @return
-     */
+    
+    
+    //// Deserialization (JSON->Object)
+
     public Object fromJson(String json) {
-        JsonParser p = new JsonParser();
-        JsonElement jse = p.parse(json);
-        if (jse instanceof JsonObject) {
-            JsonObject jsobj = (JsonObject) jse;
-            Class<?> clazz;
-            try {
-                clazz = Class.forName(jsobj.get("_class").getAsString());
-            } catch (Exception e) {
-                throw new IllegalArgumentException("couldn't determine class from JSON", e);
-            }
-            jsobj.remove("_class");
-            return gson.fromJson(jsobj, clazz);
-        } else {
-            throw new IllegalArgumentException("couldn't determine class from JSON");
+        try {
+            return fromJson(new StringReader(json));
+        } catch (IOException e) {
+            throw new IllegalStateException("BUG (shouldn't happen)", e);
+        }
+    }
+    
+    
+    public Object fromJson(Reader r) throws IOException {
+        JsonReader jsr = new JsonReader(r);
+        try {
+            jsr.setLenient(true);
+            return fromJson(jsr);
+        } finally {
+            jsr.close();
+        }
+    }
+    
+    public Object fromJson(JsonElement jse) throws IOException {
+        try {
+            JsonTreeReader jsr = new JsonTreeReader(jse);
+            jsr.setLenient(true);
+            return fromJson(jsr);
+        } catch (IOException e) {
+            throw new IllegalStateException("BUG (shouldn't happen)", e);
         }
     }
 
+    public Object fromJson(JsonReader r) throws IOException {
+        switch (r.peek()) {
+
+        case NULL:
+            r.nextNull();
+            return null;
+
+        case NUMBER:
+            try {
+                return r.nextInt();
+            } catch (NumberFormatException e) {
+                try {
+                    return r.nextLong();
+                } catch (NumberFormatException e2) {
+                    return r.nextDouble();
+                }
+            }
+            
+        case BOOLEAN:
+            return r.nextBoolean();
+            
+        case STRING:
+            return r.nextString();
+            
+        default:
+            throw new IllegalStateException("unexpected token: " + r.peek());
+
+        }
+    }
+    
 }
