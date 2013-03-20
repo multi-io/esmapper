@@ -154,6 +154,7 @@ public class JsonConverter {
     }
 
     public Object fromJson(JsonReader r) throws IOException {
+        //TODO: remove or rewrite
         switch (r.peek()) {
 
         case NULL:
@@ -181,6 +182,10 @@ public class JsonConverter {
             throw new IllegalStateException("unexpected token: " + r.peek());
 
         }
+    }
+    
+    public void readJson(JsonReader r, PropertyPath target) {
+        
     }
     
 }
