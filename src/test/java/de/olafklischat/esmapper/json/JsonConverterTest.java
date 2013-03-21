@@ -11,6 +11,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -101,6 +102,20 @@ public class JsonConverterTest {
         assertNull(c.fromJson("null"));
     }
     
+    @Test
+    public void testReadJsonPrimitiveArray() {
+        JsonConverter c = new JsonConverter();
+        assertEquals(Ints.asList(42,23,-101), c.fromJson("[42,23,-101]"));
+        assertEquals(Lists.newArrayList(42,-23,"hello"), c.fromJson("[42,-23,\"hello\"]"));
+        assertEquals(Lists.newArrayList(42, true, false, null, "hello"), c.fromJson("[42,true,false,null,\"hello\"]"));
+    }
+
+    @Test
+    public void testReadJsonPrimitivesAndNestedArraysArray() {
+        JsonConverter c = new JsonConverter();
+        assertEquals(Lists.newArrayList(42, Lists.newArrayList(67, 89, true, "bla"), 23, -101, "hello"),
+                     c.fromJson("[42,[67,89,true,\"bla\"],23,-101,\"hello\"]"));
+    }
 
 }
 
