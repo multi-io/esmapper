@@ -2,9 +2,14 @@ package de.olafklischat.esmapper.json;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 
 import org.junit.After;
@@ -71,11 +76,11 @@ public class JsonConverterTest {
         assertEquals(p.getName(), jso.get("name").getAsString());
         assertEquals(p.getPrice(), jso.get("price").getAsInt());
         assertEquals(p.getPrice(), jso.get("price").getAsInt());
-        String[] pIngs = p.getIngredients();
+        List<String> pIngs = p.getIngredients();
         JsonArray jsIngs = jso.get("ingredients").getAsJsonArray();
-        assertEquals(pIngs.length, jsIngs.size());
-        for (int i = 0; i < pIngs.length; i++) {
-            assertEquals(pIngs[i], jsIngs.get(i).getAsString());
+        assertEquals(pIngs.size(), jsIngs.size());
+        for (int i = 0; i < pIngs.size(); i++) {
+            assertEquals(pIngs.get(i), jsIngs.get(i).getAsString());
         }
         assertEquals(p.getClass().getCanonicalName(), jso.get("_class").getAsString());
         assertEquals(5, jso.entrySet().size()); //name,price,ingredients,producer,_class
@@ -102,6 +107,7 @@ public class JsonConverterTest {
         assertNull(c.fromJson("null"));
     }
     
+    @SuppressWarnings("unchecked")
     @Test
     public void testReadJsonPrimitiveArray() {
         JsonConverter c = new JsonConverter();
@@ -110,11 +116,95 @@ public class JsonConverterTest {
         assertEquals(Lists.newArrayList(42, true, false, null, "hello"), c.fromJson("[42,true,false,null,\"hello\"]"));
     }
 
+    @SuppressWarnings("unchecked")
     @Test
     public void testReadJsonPrimitivesAndNestedArraysArray() {
         JsonConverter c = new JsonConverter();
-        assertEquals(Lists.newArrayList(42, Lists.newArrayList(67, 89, true, "bla"), 23, -101, "hello"),
-                     c.fromJson("[42,[67,89,true,\"bla\"],23,-101,\"hello\"]"));
+        assertEquals(Lists.newArrayList(42, Lists.newArrayList(67, 89, true, "bla"), 23, -101, Lists.newArrayList(), "hello"),
+                     c.fromJson("[42,[67,89,true,\"bla\"],23,-101,[],\"hello\"]"));
+    }
+
+    @Test
+    public void testReadSimpleMap() {
+        JsonConverter c = new JsonConverter();
+        assertEquals(newMap("foo", "hello", "bar", 42), c.fromJson("{\"foo\":\"hello\", \"bar\":42}"));
+        assertEquals(newMap("foo", "hello", "bar", 42, "baz", Lists.newArrayList(3,4,5)),
+                     c.fromJson("{\"foo\":\"hello\", \"bar\":42, \"baz\":[3,4,5]}"));
+        assertEquals(newMap("foo", "hello", "bar", true, "baz", null),
+                     c.fromJson("{\"foo\":\"hello\", \"bar\":true, \"baz\":null}"));
+    }
+
+    @Test
+    public void testReadMapWithClass() {
+        JsonConverter c = new JsonConverter();
+        Object res = c.fromJson("{_mapClass:\"java.util.LinkedHashMap\",foo:\"hello\", bar:42}");
+        assertEquals(newMap("foo", "hello", "bar", 42), res);
+        assertTrue(res instanceof LinkedHashMap<?, ?>);
+    }
+    
+    @Test
+    public void testReadSimpleObject() {
+        JsonConverter c = new JsonConverter();
+        assertEquals(new TestOrg("BMW", 120000, 35000),
+                c.fromJson("{_class:\"de.olafklischat.esmapper.json.TestOrg\"," +
+                           "name:\"BMW\", revenue:120000, nrOfEmployees: 35000}"));
+    }
+    
+    @Test
+    public void testReadNestedObject() {
+        JsonConverter c = new JsonConverter();
+        Object fromJson = c.fromJson("" +
+                "{_class:\"de.olafklischat.esmapper.json.TestProduct\"," +
+                "name: \"3er\"," +
+                "price: 24000," +
+                "ingredients: [\"engine\",\"wheels\"]," +
+                "producer: " +
+                    "{_class:\"de.olafklischat.esmapper.json.TestOrg\"," +
+                    "name:\"BMW\"," +
+                    "revenue:120000," +
+                    "nrOfEmployees: 35000} }");
+        assertEquals(new TestProduct("3er", 24000, new String[]{"engine","wheels"}, new TestOrg("BMW", 120000, 35000)), fromJson);
+        assertTrue(((TestProduct)fromJson).getIngredients() instanceof ArrayList<?>);
+    }
+    
+    @Test
+    public void testReadAnnotatedObject() {
+        JsonConverter c = new JsonConverter();
+        TestCountry fromJson = (TestCountry) c.fromJson("" +
+                "{_class:\"de.olafklischat.esmapper.json.TestCountry\"," +
+                "name: \"Germany\"," +
+                "population: 82000000," +
+                "companies: [" +
+                    "{_class:\"de.olafklischat.esmapper.json.TestOrg\"," +
+                      "name:\"BMW\"," +
+                      "revenue:120000," +
+                      "nrOfEmployees: 35000}," +
+                    "{_class:\"de.olafklischat.esmapper.json.TestOrg\"," +
+                      "name:\"Mercedes\"," +
+                      "revenue:456," +
+                      "nrOfEmployees: 789} ]," +
+                "ignored:\"ignoredValue\" }");
+        TestOrg bmw = new TestOrg("BMW", 120000, 35000);
+        TestOrg merc = new TestOrg("Mercedes", 456, 789);
+        TestCountry ger = new TestCountry("Germany", 82000000, Lists.newArrayList(bmw, merc), null);
+        assertEquals(ger, fromJson);
+        assertNull(fromJson.getIgnored()); //should've been caught by the previous test, but check explicitly again
+        assertTrue(fromJson.getCompanies() instanceof LinkedList<?>);
+    }
+
+    private static Map<?, ?> newMap(Object... keysAndValues) {
+        Map<Object,Object> result = new HashMap<Object, Object>();
+        boolean onKey = true;
+        Object currKey = null;
+        for(Object kv : keysAndValues) {
+            if (onKey) {
+                currKey = kv;
+            } else {
+                result.put(currKey, kv);
+            }
+            onKey = !onKey;
+        }
+        return result;
     }
 
 }

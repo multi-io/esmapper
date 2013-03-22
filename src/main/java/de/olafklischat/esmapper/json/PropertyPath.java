@@ -28,6 +28,7 @@ public class PropertyPath {
         super();
         this.head = head;
         this.tail = tail;
+        head.setPathToMe(this);
     }
     
     public Node getHead() {
@@ -77,6 +78,16 @@ public class PropertyPath {
     public void set(Object value) {
         head.set(value);
     }
+    
+    @Override
+    public String toString() {
+        StringBuffer result = new StringBuffer();
+        if (tail != null) {
+            result.append(tail.toString());
+        }
+        result.append(head.toString());
+        return result.toString();
+    }
 
 
     /**
@@ -96,6 +107,8 @@ public class PropertyPath {
         
         private final Object baseObject;
         
+        private PropertyPath pathToMe;
+        
         public Node(PropertyDescriptor propDescriptor, Object baseObject) {
             this(Type.PROPERTY, propDescriptor, 0, null, baseObject);
         }
@@ -103,14 +116,13 @@ public class PropertyPath {
         public Node(int arrayIndex, Object baseObject) {
             this(Type.ARRAY_ELEMENT, null, arrayIndex, null, baseObject);
         }
-
+        
         public Node(String mapKeyOrPropertyName, Object baseObject) {
             if (baseObject instanceof Map<?, ?>) {
                 this.type = Type.MAP_VALUE;
                 this.propDescriptor = null;
                 this.arrayIndex = 0;
                 this.mapKey = mapKeyOrPropertyName;
-                this.baseObject = baseObject;
             } else {
                 this.type = Type.PROPERTY;
                 PropertyDescriptor[] pds;
@@ -130,8 +142,9 @@ public class PropertyPath {
                 }
                 this.arrayIndex = 0;
                 this.mapKey = null;
-                this.baseObject = baseObject;
             }
+            this.baseObject = baseObject;
+            this.pathToMe = new PropertyPath(this, null);
         }
 
         public Node(Type type, PropertyDescriptor propDescriptor,
@@ -158,6 +171,14 @@ public class PropertyPath {
          */
         public Object getBaseObject() {
             return baseObject;
+        }
+        
+        public void setPathToMe(PropertyPath pathToMe) {
+            this.pathToMe = pathToMe;
+        }
+        
+        public PropertyPath getPathToMe() {
+            return pathToMe;
         }
         
         public PropertyDescriptor getPropDescriptor() {
@@ -213,7 +234,7 @@ public class PropertyPath {
             try {
                 return rm.getAnnotation(annotationClass);
             } catch (Exception e) {
-                throw new IllegalStateException("error reading property " + this + ": " +
+                throw new IllegalStateException("error reading property " + pathToMe + ": " +
                         e.getLocalizedMessage(), e);
             }
         }
@@ -229,7 +250,7 @@ public class PropertyPath {
             try {
                 return rm.getAnnotations();
             } catch (Exception e) {
-                throw new IllegalStateException("error reading property " + this + ": " +
+                throw new IllegalStateException("error reading property " + pathToMe + ": " +
                         e.getLocalizedMessage(), e);
             }
         }
@@ -243,11 +264,11 @@ public class PropertyPath {
                     try {
                         return rm.invoke(baseObject);
                     } catch (Exception e) {
-                        throw new IllegalStateException("error reading property " + this + ": " +
+                        throw new IllegalStateException("error reading property " + pathToMe + ": " +
                                 e.getLocalizedMessage(), e);
                     }
                 } else {
-                    throw new IllegalStateException("property not readable: " + this);
+                    throw new IllegalStateException("property not readable: " + pathToMe);
                 }
 
             case ARRAY_ELEMENT:
@@ -267,7 +288,7 @@ public class PropertyPath {
                 }
 
             case MAP_VALUE:
-                throw new IllegalStateException("NYI");
+                return ((Map<?,?>)baseObject).get(mapKey);
             
             default:
                 throw new IllegalStateException("shouldn't happen");
@@ -283,11 +304,11 @@ public class PropertyPath {
                     try {
                         wm.invoke(baseObject, value);
                     } catch (Exception e) {
-                        throw new IllegalStateException("error setting property " + this +
+                        throw new IllegalStateException("error setting property " + pathToMe +
                                 " to " + value + ": " + e.getLocalizedMessage(), e);
                     }
                 } else {
-                    throw new IllegalStateException("property not writable: " + this);
+                    throw new IllegalStateException("property not writable: " + pathToMe);
                 }
                 break;
 
@@ -314,8 +335,25 @@ public class PropertyPath {
                 break;
 
             case MAP_VALUE:
-                throw new IllegalStateException("NYI");
+                @SuppressWarnings("unchecked")
+                Map<Object,Object> boAsMap = (Map<Object,Object>) baseObject;
+                boAsMap.put(mapKey, value);
+                break;
             
+            default:
+                throw new IllegalStateException("shouldn't happen");
+            }
+        }
+        
+        @Override
+        public String toString() {
+            switch (type) {
+            case PROPERTY:
+                return "." + getPropDescriptor().getName();
+            case ARRAY_ELEMENT:
+                return "[" + arrayIndex + "]";
+            case MAP_VALUE:
+                return "[" + mapKey + "]";
             default:
                 throw new IllegalStateException("shouldn't happen");
             }

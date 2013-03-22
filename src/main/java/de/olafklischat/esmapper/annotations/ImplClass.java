@@ -19,6 +19,6 @@ import java.lang.annotation.Target;
 @Target(ElementType.METHOD)
 @Retention(RetentionPolicy.RUNTIME)
 public @interface ImplClass {
-    Class<?> c();
+    Class<?> value();
     //TODO: ability to specify c'tor parameters too
 }

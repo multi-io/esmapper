@@ -16,14 +16,20 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.SortedMap;
+import java.util.TreeMap;
 
+import com.google.common.collect.BiMap;
+import com.google.common.collect.HashBiMap;
 import com.google.gson.JsonElement;
 import com.google.gson.internal.bind.JsonTreeReader;
 import com.google.gson.internal.bind.JsonTreeWriter;
 import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import com.google.gson.stream.JsonWriter;
 import java.util.HashSet;
 
+import de.olafklischat.esmapper.annotations.Ignore;
 import de.olafklischat.esmapper.annotations.ImplClass;
 
 public class JsonConverter {
@@ -135,7 +141,7 @@ public class JsonConverter {
         try {
             return fromJson(new StringReader(json));
         } catch (IOException e) {
-            throw new IllegalStateException("BUG (shouldn't happen)", e);
+            throw new IllegalStateException("JSON read error: " + e.getLocalizedMessage(), e);
         }
     }
     
@@ -183,55 +189,56 @@ public class JsonConverter {
         return oh.getObj();
     }
     
-    public void readJson(JsonReader r, PropertyPath target) throws IOException {
+    public void readJson(JsonReader r, PropertyPath targetPath) throws IOException {
         switch (r.peek()) {
 
-        case NULL:
-            r.nextNull();
-            target.set(null);
+        case STRING:
+            targetPath.set(r.nextString());
             break;
-
+            
+        case BOOLEAN:
+            targetPath.set(r.nextBoolean());
+            break;
+            
         case NUMBER:
             try {
-                target.set(r.nextInt());
+                targetPath.set(r.nextInt());
             } catch (NumberFormatException e) {
                 try {
-                    target.set(r.nextLong());
+                    targetPath.set(r.nextLong());
                 } catch (NumberFormatException e2) {
-                    target.set(r.nextDouble());
+                    targetPath.set(r.nextDouble());
                 }
             }
             break;
             
-        case BOOLEAN:
-            target.set(r.nextBoolean());
+        case NULL:
+            r.nextNull();
+            targetPath.set(null);
             break;
-            
-        case STRING:
-            target.set(r.nextString());
-            break;
-            
-        case BEGIN_ARRAY:
-            ////// 1. try set() target to an object that's an instance of target's type (getNodeClass()),
+
+        case BEGIN_ARRAY: {
+            ////// 1. try to set() targetPath to an object that's an instance of targetPath's type (getNodeClass()),
             //////     *and* is a collection or array
             
-            Class<?> targetClass = target.getNodeClass();
+            Class<?> targetClass = targetPath.getNodeClass();
             ////TODO array properties are a bit nasty because we have to know the length in advance.
             //    (or re-allocate the array every time in ProertyPath.Node#set)
             if (targetClass.isArray()) {
-                throw new IllegalStateException("um... array properties not supported yet :-P (" + target + ")");
+                throw new IllegalStateException("um... array properties not supported yet :-P (" + targetPath + ")");
             }
 
             Object targetObject = null;
             
-            ////try to instantiate target from @ImplClass annotation, if present
-            if (tryInstantiateFromImplClassAnnotation(target, r)) {
-                targetObject = target.get();
+            ////try to instantiate targetObject from @ImplClass annotation, if present
+            if (null != (targetObject = tryCreateImplClassAnnotationInstance(targetPath, r))) {
                 if (!(targetObject instanceof Collection<?> || targetObject.getClass().isArray())) {
-                    throw new IllegalArgumentException("" + target + ": JSON contains an array, but target type isn't compatible to that");
+                    throw new IllegalArgumentException("" + targetPath + ": JSON contains an array, but target type isn't compatible to that");
                 }
-            } else {
-                ////try to choose an implementation class heuristically
+            }
+            
+            ////otherwise, check if targetClass is some well-known interface for which we know a good implementation
+            if (null == targetObject) {
                 for (Class<?> declaredClass: defaultCollectionImplClasses.keySet()) {
                     if (targetClass.equals(declaredClass)) {
                         Class<?> implClass = defaultCollectionImplClasses.get(declaredClass);
@@ -243,43 +250,148 @@ public class JsonConverter {
                         }
                     }
                 }
+            }
 
-                ////...if that didn't work, try to instantiate the property class directly as a last resort
-                if (null == targetObject) {
-                    if (!(Collection.class.isAssignableFrom(targetClass))) {
-                        throw new IllegalArgumentException("" + target + ": JSON contains an array, but target type isn't compatible to that");
-                    }
-                    try {
-                        targetObject = targetClass.newInstance();
-                    } catch (Exception e) {
-                        throw new IllegalStateException("" + target + ": couldn't instantiate property directly: " +
-                                    e.getLocalizedMessage(), e);
-                    }
+            ////...if that didn't work either, try to instantiate the property class directly as a last resort
+            if (null == targetObject) {
+                if (!(Collection.class.isAssignableFrom(targetClass))) {
+                    throw new IllegalArgumentException("" + targetPath + ": JSON contains an array, but target type isn't compatible to that");
                 }
-                
-                if (null == targetObject) {
-                    ////give up
-                    throw new IllegalArgumentException("failed to instantiate property " + target);
+                try {
+                    targetObject = targetClass.newInstance();
+                } catch (Exception e) {
+                    throw new IllegalStateException("" + targetPath + ": couldn't instantiate property directly: " +
+                                e.getLocalizedMessage(), e);
                 }
-
-                target.set(targetObject);
             }
             
+            ////...if that didn't work either, give up
+            if (null == targetObject) {
+                throw new IllegalArgumentException("failed to instantiate property " + targetPath);
+            }
+
+            //targetObject has been created successfully
+            targetPath.set(targetObject);
             
             ////// 2. fill the created target object with the array elements
             r.beginArray();
             int index = 0;
             while (r.hasNext()) {
-                PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(index, targetObject), target);
+                PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(index, targetObject), targetPath);
                 readJson(r, elementPath);
                 index++;
             }
             r.endArray();
+        }
+        break;
             
-            break;
+        case BEGIN_OBJECT: {
+            ////// 1. try to set() targetPath to an object that's an instance of targetPath's type (getNodeClass()),
+            //////     *and* is a map or bean
             
-        case BEGIN_OBJECT:
-            break;
+            Object targetObject = null;
+
+            ///we'll read the first key into this variable during targetObject instantiation,
+            //  before looping over all the map elements in the JSON. Reason: we need to
+            //  check for _class / _mapClass keys. If those aren't present, firstKey will
+            //  contain the name of the first regular property / map key to set
+            String firstKey = null;
+
+            Class<?> targetClass = targetPath.getNodeClass();
+
+            //try to instantiate targetObject from @ImplClass annotation, if present
+            if (null != (targetObject = tryCreateImplClassAnnotationInstance(targetPath, r))) {
+                r.beginObject(); // skip over the { because we do it in the next alternative (below) too
+            }
+
+            //if that didn't work, try to instantiate the class specified in _class or _mapClass in the JSON (if present)
+            if (null == targetObject) {
+                //need to fetch the first key of the map to see if it is _class or _mapClass,
+                // in which case targetObject must become an instance of that.
+                r.beginObject();
+                if (r.hasNext()) {
+                    firstKey = r.nextName();
+                    if ("_class".equals(firstKey) || "_mapClass".equals(firstKey)) {
+                        if (r.peek() != JsonToken.STRING) {
+                            throw new IllegalStateException("" + targetPath + ": _class/_mapClass require a string value");
+                        }
+                        String className = r.nextString();
+                        firstKey = null;
+                        try {
+                            targetObject = Class.forName(className).newInstance();
+                        } catch (Exception e) {
+                            throw new IllegalStateException("" + targetPath +
+                                    ": couldn't instantiate " + className + ": " + e.getLocalizedMessage(), e);
+                        }
+                    }
+                }
+            }
+
+            //...if that didn't work, check if targetClass is some well-known interface for which we know a good implementation
+            if (null == targetObject) {
+                for (Class<?> declaredClass: defaultMapImplClasses.keySet()) {
+                    if (targetClass.equals(declaredClass)) {
+                        Class<?> implClass = defaultMapImplClasses.get(declaredClass);
+                        try {
+                            targetObject = implClass.newInstance();
+                            break;
+                        } catch (Exception e) {
+                            throw new IllegalArgumentException("shouldn't happen", e);
+                        }
+                    }
+                }
+            }
+            
+            //...if that didn't work either, try to instantiate the property class directly
+            if (null == targetObject) {
+                try {
+                    targetObject = targetClass.newInstance();
+                } catch (Exception e) {
+                    throw new IllegalStateException("" + targetPath + ": couldn't instantiate property directly: " +
+                                e.getLocalizedMessage(), e);
+                }
+            }
+            
+            //...if that didn't work either, give up
+            if (null == targetObject) {
+                throw new IllegalArgumentException("failed to instantiate property " + targetPath);
+            }
+
+            //targetObject has been created successfully
+            targetPath.set(targetObject);
+
+            ////// 2. targetObject has been set() into targetPath, now fill it
+            if (firstKey != null) {
+                //firstKey is a regular property / map key, and r is located at the beginning of the value
+                if (firstKey.startsWith("_")) { //skip any values whose keys start with "_"
+                    r.skipValue();
+                } else {
+                    //else, read the value and set it into targetObject
+                    PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(firstKey, targetObject), targetPath);
+                    if (elementPath.getAnnotation(Ignore.class) == null) {
+                        readJson(r, elementPath);
+                    } else {
+                        r.skipValue();
+                    }
+                }
+            }
+            while (r.hasNext()) {
+                String key = r.nextName();
+                if (key.startsWith("_")) { //skip any values whose keys start with "_"
+                    r.skipValue();
+                } else {
+                    //else, read the value and set it into targetObject
+                    PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(key, targetObject), targetPath);
+                    if (elementPath.getAnnotation(Ignore.class) == null) {
+                        readJson(r, elementPath);
+                    } else {
+                        r.skipValue();
+                    }
+                }
+            }
+            r.endObject();
+        }
+        break;
             
         default:
             throw new IllegalStateException("unexpected token: " + r.peek());
@@ -287,29 +399,32 @@ public class JsonConverter {
         }
     }
 
-    private boolean tryInstantiateFromImplClassAnnotation(PropertyPath target, JsonReader r) throws IOException {
-        ////check for @ImplClass annotation first...
+    private Object tryCreateImplClassAnnotationInstance(PropertyPath target, JsonReader r) throws IOException {
         ImplClass ic = target.getAnnotation(ImplClass.class);
         if (null != ic) {
             try {
-                target.set(ic.c().newInstance());
+                return ic.value().newInstance();
             } catch (Exception e) {
                 throw new IllegalStateException("" + target + ": Failed to instantiate @ImplClass ("
-                            + ic.c().getCanonicalName() + "): " + e.getLocalizedMessage(), e);
+                            + ic.value().getCanonicalName() + "): " + e.getLocalizedMessage(), e);
             }
-            return true;
-        } else {
-            return false;
         }
+        return null;
     }
     
     private static final Map<Class<?>, Class<?>> defaultCollectionImplClasses = new HashMap<Class<?>, Class<?>>();
+    private static final Map<Class<?>, Class<?>> defaultMapImplClasses = new HashMap<Class<?>, Class<?>>();
     
     static {
         defaultCollectionImplClasses.put(Collection.class, ArrayList.class);
         defaultCollectionImplClasses.put(List.class, ArrayList.class);
         defaultCollectionImplClasses.put(Set.class, HashSet.class);
         defaultCollectionImplClasses.put(Object.class, ArrayList.class);
+
+        defaultMapImplClasses.put(BiMap.class, HashBiMap.class);
+        defaultMapImplClasses.put(SortedMap.class, TreeMap.class);
+        defaultMapImplClasses.put(Map.class, HashMap.class);
+        defaultMapImplClasses.put(Object.class, HashMap.class);
     }
     
 }
