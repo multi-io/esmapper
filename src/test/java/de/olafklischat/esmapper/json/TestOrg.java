@@ -70,5 +70,10 @@ public class TestOrg {
             return false;
         return true;
     }
+    
+    @Override
+    public String toString() {
+        return super.toString() + "[name=" + name + ", revenue=" + revenue + "nrOfEmployees=" + nrOfEmployees + "]";
+    }
 
 }

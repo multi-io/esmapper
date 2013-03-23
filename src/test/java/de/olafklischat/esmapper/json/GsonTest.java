@@ -18,74 +18,72 @@ import com.google.gson.reflect.TypeToken;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 
-import de.olafklischat.esmapper.Organization;
-import de.olafklischat.esmapper.Product;
-
 public class GsonTest {
 	
 	private static class TAF implements TypeAdapterFactory {
-		@Override
+		@SuppressWarnings("unchecked")
+        @Override
 		public <T> TypeAdapter<T> create(Gson gson, TypeToken<T> type) {
 			System.out.println("creating adapter for " + type);
-			if (Organization.class.equals(type.getType())) {
+			if (TestOrg.class.equals(type.getType())) {
 				return (TypeAdapter<T>) new OrgTA();
 			}
 			return null;
 		}
 	}
 
-	private static class OrgTA extends TypeAdapter<Organization> {
+	private static class OrgTA extends TypeAdapter<TestOrg> {
 
 		@Override
-		public void write(JsonWriter out, Organization value)
+		public void write(JsonWriter out, TestOrg value)
 				throws IOException {
 			out.value(value.getName());
 		}
 
 		@Override
-		public Organization read(JsonReader in) throws IOException {
+		public TestOrg read(JsonReader in) throws IOException {
             System.out.println("OrgTA#read");
-            Organization result = new Organization();
+            TestOrg result = new TestOrg();
             result.setName(in.nextString());
 			return result;
 		}
 		
 	}
 	
-	private static class OrgSerDeser implements JsonSerializer<Organization>, JsonDeserializer<Organization> {
+	@SuppressWarnings("unused")
+    private static class OrgSerDeser implements JsonSerializer<TestOrg>, JsonDeserializer<TestOrg> {
 	    @Override
-	    public JsonElement serialize(Organization src, Type typeOfSrc,
+	    public JsonElement serialize(TestOrg src, Type typeOfSrc,
 	            JsonSerializationContext context) {
 	        return new JsonPrimitive(src.getName());
 	    }
 	    @Override
-	    public Organization deserialize(JsonElement json, Type typeOfT,
+	    public TestOrg deserialize(JsonElement json, Type typeOfT,
 	            JsonDeserializationContext context) throws JsonParseException {
-	        Organization result = new Organization();
+	        TestOrg result = new TestOrg();
 	        result.setName(json.getAsString());
 	        return result;
 	    }
 	}
 
 	public static void main(String[] args) throws Exception {
-		Organization org = new Organization();
-		org.setId("123");
+	    TestOrg org = new TestOrg();
 		org.setName("BMW");
-		Product p = new Product();
-		p.setId("456");
+		org.setNrOfEmployees(123);
+		TestProduct p = new TestProduct();
 		p.setName("Z3");
 		p.setProducer(org);
 		
 		GsonBuilder gsb = new GsonBuilder();
 		gsb.setPrettyPrinting();
 		gsb.registerTypeAdapterFactory(new TAF());
-		//gsb.registerTypeAdapter(Organization.class, new OrgSerDeser());
+		//gsb.registerTypeAdapter(TestOrg.class, new OrgSerDeser());
 		Gson gson = gsb.create();
 		String json = gson.toJson(p);
 
 		System.out.println(json);
 
-		Product p2 = gson.fromJson(json, Product.class);
+		TestProduct p2 = gson.fromJson(json, TestProduct.class);
         System.out.println("readback: " + p2);
 	}
 	

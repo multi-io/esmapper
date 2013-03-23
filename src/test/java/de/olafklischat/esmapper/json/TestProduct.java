@@ -1,6 +1,5 @@
 package de.olafklischat.esmapper.json;
 
-import java.util.Arrays;
 import java.util.List;
 
 import com.google.common.collect.Lists;
@@ -102,6 +101,11 @@ public class TestProduct {
         } else if (!producer.equals(other.producer))
             return false;
         return true;
+    }
+
+    @Override
+    public String toString() {
+        return super.toString() + "[name=" + name + ", producer=" + producer + "]";
     }
 
 }
