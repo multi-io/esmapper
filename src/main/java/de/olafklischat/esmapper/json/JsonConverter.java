@@ -201,15 +201,17 @@ public class JsonConverter {
             break;
             
         case NUMBER:
+            Number fromJson;
             try {
-                targetPath.set(r.nextInt());
+                fromJson = r.nextInt();
             } catch (NumberFormatException e) {
                 try {
-                    targetPath.set(r.nextLong());
+                    fromJson = r.nextLong();
                 } catch (NumberFormatException e2) {
-                    targetPath.set(r.nextDouble());
+                    fromJson = r.nextDouble();
                 }
             }
+            targetPath.set(convertNumber(fromJson, targetPath.getNodeClass()));
             break;
             
         case NULL:
@@ -396,6 +398,21 @@ public class JsonConverter {
         default:
             throw new IllegalStateException("unexpected token: " + r.peek());
 
+        }
+    }
+    
+    private Object convertNumber(Number n, Class<?> targetType) {
+        if (targetType.isPrimitive()) {
+            //in this case, the JVM does the conversion
+            return n;
+        } else if (targetType == Long.class && (n instanceof Integer || n instanceof Long)) {
+            return n.longValue();
+        } else if (targetType == Float.class) {
+            return n.floatValue();
+        } else if (targetType == Double.class) {
+            return n.doubleValue();
+        } else {
+            return n;
         }
     }
 

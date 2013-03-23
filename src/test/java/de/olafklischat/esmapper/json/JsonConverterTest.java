@@ -1,8 +1,6 @@
 package de.olafklischat.esmapper.json;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.*;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -37,6 +35,7 @@ public class JsonConverterTest {
         JsonConverter c = new JsonConverter();
         assertEquals("42", c.toJson(42));
         assertEquals("-4223", c.toJson(-4223));
+        assertEquals("12345678910", c.toJson(12345678910L));
         assertEquals("0", c.toJson(0));
         assertEquals("3.14", c.toJson(3.14));
         assertEquals("\"Hello World\"", c.toJson("Hello World"));
@@ -99,6 +98,7 @@ public class JsonConverterTest {
         JsonConverter c = new JsonConverter();
         assertEquals(42, c.fromJson("42"));
         assertEquals(-4223, c.fromJson("-4223"));
+        assertEquals(12345678910L, c.fromJson("12345678910"));
         assertEquals(0, c.fromJson("0"));
         assertEquals(3.14, c.fromJson("3.14"));
         assertEquals("Hello World", c.fromJson("\"Hello World\""));
@@ -190,6 +190,39 @@ public class JsonConverterTest {
         assertEquals(ger, fromJson);
         assertNull(fromJson.getIgnored()); //should've been caught by the previous test, but check explicitly again
         assertTrue(fromJson.getCompanies() instanceof LinkedList<?>);
+    }
+    
+    @Test
+    public void testReadWithConversions() {
+        String json = "" +
+        		"{_class:\"de.olafklischat.esmapper.json.TestAutoConversionsBean\"," +
+        		"primInt:1," +
+        		"primLong:2," +
+                "primFloat:3," +
+                "primDouble:4," +
+        		"objInt:5," +
+        		"objLong:6," +
+                "objFloat:7," +
+                "objDouble:8}";
+        TestAutoConversionsBean expected = new TestAutoConversionsBean(1, 2, 3, 4, 5, 6L, 7F, 8D);
+        JsonConverter c = new JsonConverter();
+        assertEquals(expected, c.fromJson(json));
+        
+        try {
+            c.fromJson("{_class:\"de.olafklischat.esmapper.json.TestAutoConversionsBean\",primInt:1.7}");
+            fail("exception expected");
+        } catch (IllegalStateException e) {
+        }
+        try {
+            c.fromJson("{_class:\"de.olafklischat.esmapper.json.TestAutoConversionsBean\",objInt:1.7}");
+            fail("exception expected");
+        } catch (IllegalStateException e) {
+        }
+        try {
+            c.fromJson("{_class:\"de.olafklischat.esmapper.json.TestAutoConversionsBean\",objLong:1.7}");
+            fail("exception expected");
+        } catch (IllegalStateException e) {
+        }
     }
 
     private static Map<?, ?> newMap(Object... keysAndValues) {

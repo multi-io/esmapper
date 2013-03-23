@@ -212,7 +212,7 @@ public class PropertyPath {
                 if (baseObject.getClass().isArray()) {
                     return baseObject.getClass().getComponentType();
                 } else {
-                    return Object.class;  //TODO: return the map's generics component type, if defined
+                    return Object.class;  //TODO: return the collection's generics component type, if defined
                 }
             
             case MAP_VALUE:
