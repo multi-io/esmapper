@@ -137,56 +137,59 @@ public class JsonConverter {
     
     //// Deserialization (JSON->Object)
 
-    public Object fromJson(String json) {
+    @SuppressWarnings("unchecked")
+    public <T> T fromJson(String json) {
+        return (T) fromJson(json, Object.class);
+    }
+    
+    public <T> T fromJson(String json, Class<T> clazz) {
         try {
-            return fromJson(new StringReader(json));
+            return fromJson(new StringReader(json), clazz);
         } catch (IOException e) {
             throw new IllegalStateException("JSON read error: " + e.getLocalizedMessage(), e);
         }
     }
     
+    @SuppressWarnings("unchecked")
+    public <T> T fromJson(Reader r) throws IOException {
+        return (T) fromJson(r, Object.class);
+    }
     
-    public Object fromJson(Reader r) throws IOException {
+    public <T> T fromJson(Reader r, Class<T> clazz) throws IOException {
         JsonReader jsr = new JsonReader(r);
         try {
             jsr.setLenient(true);
-            return fromJson(jsr);
+            return fromJson(jsr, clazz);
         } finally {
             jsr.close();
         }
     }
     
-    public Object fromJson(JsonElement jse) throws IOException {
+    @SuppressWarnings("unchecked")
+    public <T> T fromJson(JsonElement jse) throws IOException {
+        return (T) fromJson(jse, Object.class);
+    }
+
+    public <T> T fromJson(JsonElement jse, Class<T> clazz) throws IOException {
         try {
             JsonTreeReader jsr = new JsonTreeReader(jse);
             jsr.setLenient(true);
-            return fromJson(jsr);
+            return fromJson(jsr, clazz);
         } catch (IOException e) {
             throw new IllegalStateException("BUG (shouldn't happen)", e);
         }
     }
-
-    /**
-     * Used for holding the root object in Object fromJson(JsonReader)
-     * 
-     * @author olaf
-     */
-    private static class ObjectHolder {
-        private Object obj;
-        public Object getObj() {
-            return obj;
-        }
-        @SuppressWarnings("unused")
-        public void setObj(Object obj) {
-            this.obj = obj;
-        }
-    }
     
-    public Object fromJson(JsonReader r) throws IOException {
-        ObjectHolder oh = new ObjectHolder();
-        PropertyPath rootPath = new PropertyPath(new PropertyPath.Node("obj", oh), null);
+    @SuppressWarnings("unchecked")
+    public <T> T fromJson(JsonReader r) throws IOException {
+        return (T) fromJson(r, Object.class);
+    }
+
+    @SuppressWarnings("unchecked")
+    public <T> T fromJson(JsonReader r, Class<T> clazz) throws IOException {
+        PropertyPath rootPath = new PropertyPath(new PropertyPath.Node(clazz), null);
         readJson(r, rootPath);
-        return oh.getObj();
+        return (T) rootPath.get();
     }
     
     public void readJson(JsonReader r, PropertyPath targetPath) throws IOException {

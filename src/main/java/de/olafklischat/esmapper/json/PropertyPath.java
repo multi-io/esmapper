@@ -98,14 +98,21 @@ public class PropertyPath {
      * 
      */
     public static class Node {
-        public static enum Type { PROPERTY, ARRAY_ELEMENT, MAP_VALUE }
+        public static enum Type { PROPERTY, ARRAY_ELEMENT, MAP_VALUE, ROOT }
 
         private final Type type;
-        private /*final*/ PropertyDescriptor propDescriptor; //field is final, but can't be because compiler complains in Node(String,Object) c'tor
-        private final int arrayIndex;
-        private final String mapKey;
+        
+        //field is final, but can't be because compiler complains in Node(String,Object) c'tor
+        private /*final*/ PropertyDescriptor propDescriptor; //needed when type==PROPERTY
+        private final int arrayIndex;   //needed when type==ARRAY_ELEMENT
+        private final String mapKey;    //needed when type==MAP_VALUE
+
         
         private final Object baseObject;
+        
+        private final Class<?> rootClass;  //needed when type==ROOT
+        private Object rootObject;   //needed when type==ROOT
+        // (ROOT is a special type used only for the topmost (root) object in JsonConverter.fromJson(json, root) et al.)
         
         private PropertyPath pathToMe;
         
@@ -115,6 +122,16 @@ public class PropertyPath {
 
         public Node(int arrayIndex, Object baseObject) {
             this(Type.ARRAY_ELEMENT, null, arrayIndex, null, baseObject);
+        }
+        
+        public Node(Class<?> rootClass) {
+            this.type = Type.ROOT;
+            this.propDescriptor = null;
+            this.arrayIndex = 0;
+            this.mapKey = null;
+            this.baseObject = null;
+            this.rootClass = rootClass;
+            this.pathToMe = new PropertyPath(this, null);
         }
         
         public Node(String mapKeyOrPropertyName, Object baseObject) {
@@ -144,6 +161,7 @@ public class PropertyPath {
                 this.mapKey = null;
             }
             this.baseObject = baseObject;
+            this.rootClass = null;
             this.pathToMe = new PropertyPath(this, null);
         }
 
@@ -154,6 +172,8 @@ public class PropertyPath {
             this.arrayIndex = arrayIndex;
             this.mapKey = mapKey;
             this.baseObject = baseObject;
+            this.rootClass = null;
+            this.pathToMe = new PropertyPath(this, null);
         }
 
         public Type getType() {
@@ -217,6 +237,9 @@ public class PropertyPath {
             
             case MAP_VALUE:
                 return Object.class; //TODO: return the map's generics value type, if defined
+                
+            case ROOT:
+                return rootClass;
             
             default:
                 throw new IllegalStateException("shouldn't happen");
@@ -290,6 +313,9 @@ public class PropertyPath {
             case MAP_VALUE:
                 return ((Map<?,?>)baseObject).get(mapKey);
             
+            case ROOT:
+                return rootObject;
+
             default:
                 throw new IllegalStateException("shouldn't happen");
             }
@@ -340,6 +366,10 @@ public class PropertyPath {
                 boAsMap.put(mapKey, value);
                 break;
             
+            case ROOT:
+                rootObject = value;
+                break;
+
             default:
                 throw new IllegalStateException("shouldn't happen");
             }
@@ -354,6 +384,8 @@ public class PropertyPath {
                 return "[" + arrayIndex + "]";
             case MAP_VALUE:
                 return "[" + mapKey + "]";
+            case ROOT:
+                return "[" + rootClass.getCanonicalName() + "]";
             default:
                 throw new IllegalStateException("shouldn't happen");
             }

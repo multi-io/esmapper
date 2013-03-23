@@ -151,6 +151,13 @@ public class JsonConverterTest {
     }
     
     @Test
+    public void testReadSimpleObjectWithClassHint() {
+        JsonConverter c = new JsonConverter();
+        assertEquals(new TestOrg("BMW", 120000, 35000),
+                c.fromJson("{name:\"BMW\", revenue:120000, nrOfEmployees: 35000}", TestOrg.class));
+    }
+
+    @Test
     public void testReadNestedObject() {
         JsonConverter c = new JsonConverter();
         Object fromJson = c.fromJson("" +

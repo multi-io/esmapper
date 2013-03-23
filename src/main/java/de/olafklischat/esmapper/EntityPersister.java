@@ -133,8 +133,8 @@ public class EntityPersister<EntityType extends Entity> {
     
     private EntityType fromJSON(String json) {
         JsonConverter jsc = new JsonConverter();
-        return (EntityType) jsc.fromJson(json);
-        //return jsc.fromJson(json, entityType);
+        //return (EntityType) jsc.fromJson(json);
+        return jsc.fromJson(json, entityType);
     }
 
 }
