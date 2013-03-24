@@ -2,6 +2,7 @@ package de.olafklischat.esmapper.json;
 
 import static org.junit.Assert.*;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -9,6 +10,7 @@ import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.StringTokenizer;
 
 import org.junit.After;
 import org.junit.Before;
@@ -19,6 +21,8 @@ import com.google.common.primitives.Ints;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonWriter;
 
 public class JsonConverterTest {
 
@@ -229,6 +233,69 @@ public class JsonConverterTest {
             c.fromJson("{_class:\"de.olafklischat.esmapper.json.TestAutoConversionsBean\",objLong:1.7}");
             fail("exception expected");
         } catch (IllegalStateException e) {
+        }
+    }
+    
+    @Test
+    public void testCustomMarshallerUnmarshaller() {
+        String json = "" +
+        		"{name:\"A-Class\"," +
+        		"price:123," +
+        		"ingredients:[\"engine\",\"wheels\"]," +
+        		"producer:\"Mercedes,456,789\"}";
+        JsonConverter c = new JsonConverter();
+
+        //deserialization with custom unmarshaller
+        c.registerUnmarshaller(new TestOrgFromStringUnmarshaller());
+        TestProduct p = c.fromJson(json, TestProduct.class);
+        assertEquals("A-Class", p.getName());
+        assertEquals(123, p.getPrice());
+        assertEquals(Lists.newArrayList("engine", "wheels"), p.getIngredients());
+        assertEquals(new TestOrg("Mercedes", 456, 789), p.getProducer());
+        
+        p.getProducer().setName("DaimlerChrysler");
+        p.getProducer().setNrOfEmployees(999);
+
+        //serialization without custom marshaller
+        JsonObject pJso1 = c.toJsonElement(p).getAsJsonObject();
+        assertEquals("A-Class", pJso1.get("name").getAsString());
+        JsonObject oJso1 = pJso1.get("producer").getAsJsonObject();
+        assertEquals("DaimlerChrysler", oJso1.get("name").getAsString());
+        assertEquals(456, oJso1.get("revenue").getAsInt());
+        assertEquals(999, oJso1.get("nrOfEmployees").getAsInt());
+
+        //serialization with custom marshaller
+        c.registerMarshaller(new TestOrgToStringMarshaller());
+        JsonObject pJso2 = c.toJsonElement(p).getAsJsonObject();
+        assertEquals("A-Class", pJso2.get("name").getAsString());
+        assertEquals("DaimlerChrysler,456,999", pJso2.get("producer").getAsString());
+    }
+
+    private static class TestOrgToStringMarshaller implements JsonMarshaller {
+        @Override
+        public boolean writeJson(PropertyPath sourcePath, JsonWriter out,
+                JsonConverter context) throws IOException {
+            if (sourcePath.getNodeClass() != TestOrg.class) {
+                return false;
+            }
+            TestOrg org = (TestOrg) sourcePath.get();
+            out.value(org.getName() + "," + org.getRevenue() + "," + org.getNrOfEmployees());
+            return true;
+        }
+    }
+    
+    private static class TestOrgFromStringUnmarshaller implements JsonUnmarshaller {
+        @Override
+        public boolean readJson(JsonReader r, PropertyPath targetPath,
+                JsonConverter context) throws IOException {
+            if (targetPath.getNodeClass() != TestOrg.class) {
+                return false;
+            }
+            String orgStr = r.nextString();
+            StringTokenizer st = new StringTokenizer(orgStr, ",");
+            TestOrg org = new TestOrg(st.nextToken(), Integer.valueOf(st.nextToken()), Integer.valueOf(st.nextToken()));
+            targetPath.set(org);
+            return true;
         }
     }
 
