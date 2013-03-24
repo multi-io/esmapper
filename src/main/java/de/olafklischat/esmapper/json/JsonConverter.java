@@ -9,7 +9,6 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.reflect.Array;
-import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -71,6 +70,13 @@ public class JsonConverter {
     }
     
     public void writeJson(Object src, JsonWriter out) throws IOException {
+        PropertyPath rootPath = new PropertyPath(new PropertyPath.Node((src == null ? Object.class : src.getClass())), null);
+        rootPath.set(src);
+        writeJson(rootPath, out);
+    }
+    
+    public void writeJson(PropertyPath sourcePath, JsonWriter out) throws IOException {
+        Object src = sourcePath.get();
         if (src == null) {
             out.nullValue();
         } else {
@@ -82,19 +88,22 @@ public class JsonConverter {
             } else if (src instanceof String) {
                 out.value((String)src);
             } else if (src instanceof Collection<?>) {
+                Collection<?> srcColl = (Collection<?>) src;
                 out.beginArray();
                 //TODO might want to remember the collection's class here
                 //out.name("_collClass");
                 //out.value(src.getClass().getCanonicalName());
-                for (Object elt : (Collection<?>) src) {
-                    writeJson(elt, out);
+                for (int i = 0; i < srcColl.size(); i++) {
+                    PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(i, src), sourcePath);
+                    writeJson(elementPath, out);
                 }
                 out.endArray();
             } else if (c.isArray()) {
                 out.beginArray();
                 int length = Array.getLength(src);
                 for (int i = 0; i < length; i++) {
-                    writeJson(Array.get(src, i), out);
+                    PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(i, src), sourcePath);
+                    writeJson(elementPath, out);
                 }
                 out.endArray();
             } else if (src instanceof Map<?, ?>) {
@@ -104,7 +113,8 @@ public class JsonConverter {
                 out.value(srcMap.getClass().getCanonicalName());
                 for (Object key : srcMap.keySet()) {
                     out.name(key.toString());
-                    writeJson(srcMap.get(key), out);
+                    PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(key.toString(), src), sourcePath);
+                    writeJson(elementPath, out);
                 }
                 out.endObject();
             } else {
@@ -118,11 +128,12 @@ public class JsonConverter {
                         if ("class".equals(pd.getName())) { //TODO: exclude anything from j.l.Object?
                             continue;
                         }
-                        Method rm = pd.getReadMethod();
-                        if (rm != null) {
-                            out.name(pd.getName());
-                            writeJson(rm.invoke(src), out);
+                        PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(pd, src), sourcePath);
+                        if (null != elementPath.getAnnotation(Ignore.class)) {
+                            continue;
                         }
+                        out.name(pd.getName());
+                        writeJson(elementPath, out);
                     }
                 } catch (Exception e) {
                     throw new IllegalStateException("error introspecting " + src + ": " + e.getLocalizedMessage(), e);
