@@ -1,7 +1,5 @@
 package de.olafklischat.esmapper;
 
-import java.lang.reflect.ParameterizedType;
-
 import org.elasticsearch.action.get.GetRequestBuilder;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequestBuilder;
@@ -14,40 +12,10 @@ import org.elasticsearch.node.NodeBuilder;
 import de.olafklischat.esmapper.Entity;
 import de.olafklischat.esmapper.json.JsonConverter;
 
-public class EntityPersister<EntityType extends Entity> {
+public class EntityPersister {
 
-    /**
-     * EntityType (generics parameter), but available at runtime
-     */
-    private final Class<EntityType> entityType;
-    
     private Client esClient;
 
-    /**
-     * When instantiating this class directly, you have to pass the entity type (the generic parameter)
-     * to the constructor because otherwise it wouldn't be available at runtime due to limitations to
-     * Java's generics implementation (type erasure).
-     * 
-     * @param entityType
-     */
-    public EntityPersister(Class<EntityType> entityType) {
-        this.entityType = entityType;
-    }
-    
-    /**
-     * C'tor to be used by subclasses. Determines the entity type internally from generics information
-     * written into the subclass's .class file by the compiler.
-     */
-    @SuppressWarnings("unchecked")
-    protected EntityPersister() {
-        ParameterizedType superclass = (ParameterizedType) this.getClass().getGenericSuperclass();
-        if (superclass == null || ! superclass.getRawType().equals(EntityPersister.class) || superclass.getActualTypeArguments().length != 1) {
-            throw new IllegalArgumentException("Can't determine entity type at runtime when" +
-                    " NormizeEntityPersister isn't used as a base class. Pass the entity type to the constructor explicitly");
-        }
-        this.entityType = (Class<EntityType>) superclass.getActualTypeArguments()[0];
-    }
-    
     public void setEsClient(Client esClient) {
         this.esClient = esClient;
     }
@@ -71,7 +39,7 @@ public class EntityPersister<EntityType extends Entity> {
      * @return
      * @throws VersionConflictException if the object was already newer in the database
      */
-    public EntityType persist(EntityType o) {
+    public <T extends Entity> T persist(T o) {
         return persist(o, false);
     }
 
@@ -82,7 +50,7 @@ public class EntityPersister<EntityType extends Entity> {
      * @throws VersionConflictException if the object was already newer in the database. Won't happen if ignoreVersion.
      * @return
      */
-    public EntityType persist(EntityType entity, boolean ignoreVersion) {
+    public <T extends Entity> T persist(T entity, boolean ignoreVersion) {
         String prevId = entity.getId();
         Long prevVersion = entity.getVersion();
         if ((prevId == null) != (prevVersion == null)) {
@@ -100,7 +68,7 @@ public class EntityPersister<EntityType extends Entity> {
             irb.setCreate(true);
         }
         irb.setIndex("esdb");
-        irb.setType(entityType.getSimpleName());
+        irb.setType(entity.getClass().getSimpleName());
         irb.setSource(toJSON(entity));
         try {
             IndexResponse res = irb.execute().actionGet();
@@ -114,27 +82,26 @@ public class EntityPersister<EntityType extends Entity> {
         return entity;
     }
 
-    public EntityType findById(String id) {
-        GetRequestBuilder grb = getEsClient().prepareGet("esdb", entityType.getSimpleName(), id);
+    public <T extends Entity> T findById(String id, Class<T> classOfT) {
+        GetRequestBuilder grb = getEsClient().prepareGet("esdb", classOfT.getSimpleName(), id);
         GetResponse res = grb.execute().actionGet();
         if (!res.exists()) {
             return null;
         }
-        EntityType result = fromJSON(res.getSourceAsString());
+        T result = fromJSON(res.getSourceAsString(), classOfT);
         result.setId(res.getId());
         result.setVersion(res.getVersion());
         return result;
     }
     
-    private String toJSON(EntityType entity) {
+    private <T extends Entity> String toJSON(T entity) {
         JsonConverter jsc = new JsonConverter();
         return jsc.toJson(entity);
     }
     
-    private EntityType fromJSON(String json) {
+    private <T extends Entity> T fromJSON(String json, Class<T> classOfT) {
         JsonConverter jsc = new JsonConverter();
-        //return (EntityType) jsc.fromJson(json);
-        return jsc.fromJson(json, entityType);
+        return jsc.fromJson(json, classOfT);
     }
 
 }

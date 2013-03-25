@@ -10,8 +10,9 @@ import static org.junit.Assert.*;
 
 public class EntityPersisterTest {
 
+    @SuppressWarnings("unused")
     private Node localDB;
-    private TestEntityPersister ep;
+    private EntityPersister ep;
     
     @Before
     public void setUp() throws Exception {
@@ -22,7 +23,7 @@ public class EntityPersisterTest {
         localDB = localDBBuilder.node();
 
         Node localClient = NodeBuilder.nodeBuilder().local(true).client(true).node();
-        ep = new TestEntityPersister();
+        ep = new EntityPersister();
         ep.setEsClient(localClient.client());
     }
     
@@ -41,7 +42,7 @@ public class EntityPersisterTest {
         assertNotNull(e.getId());
         assertEquals(new Long(1), e.getVersion());
         
-        TestEntity e2 = ep.findById(e.getId());
+        TestEntity e2 = ep.findById(e.getId(), TestEntity.class);
         assertEquals(42, e2.getAge());
         assertEquals(e, e2);
         
@@ -50,7 +51,7 @@ public class EntityPersisterTest {
         assertEquals(e2.getId(), e.getId()); //ID hasn't changed
         assertEquals(new Long(2), e.getVersion()); //version has incremented
 
-        TestEntity e3 = ep.findById(e.getId());
+        TestEntity e3 = ep.findById(e.getId(), TestEntity.class);
         assertEquals(44, e3.getAge());
         assertEquals(new Long(2), e3.getVersion());
         assertEquals(e, e3);
@@ -60,7 +61,7 @@ public class EntityPersisterTest {
     public void testNotFound() {
         ep.persist(new TestEntity("hans", 21, "foo bar baz"));  //make sure the index exists...
 
-        TestEntity e2 = ep.findById("xxx-doesnt-exist-xxx");
+        TestEntity e2 = ep.findById("xxx-doesnt-exist-xxx", TestEntity.class);
         assertNull(e2);
     }
     
@@ -79,7 +80,7 @@ public class EntityPersisterTest {
         assertNotNull(e.getId());
         assertEquals(new Long(1), e.getVersion());
         
-        TestEntity e2 = ep.findById(e.getId());
+        TestEntity e2 = ep.findById(e.getId(), TestEntity.class);
         assertEquals(e, e2);
         
         e.setName("hugo");
@@ -88,7 +89,7 @@ public class EntityPersisterTest {
         assertEquals(e2.getId(), e.getId()); //ID hasn't changed
         assertEquals(new Long(2), e.getVersion()); //version has incremented
 
-        assertEquals(ep.findById(e.getId()), e);
+        assertEquals(ep.findById(e.getId(), TestEntity.class), e);
         
         e.setAge(46);
         e.setVersion(1L); //try to store against deprecated version...
@@ -102,7 +103,7 @@ public class EntityPersisterTest {
         assertEquals(e2.getId(), e.getId());
         assertEquals(new Long(3), e.getVersion());
 
-        TestEntity e3 = ep.findById(e.getId());
+        TestEntity e3 = ep.findById(e.getId(), TestEntity.class);
         assertEquals(46, e3.getAge());
         assertEquals(new Long(3), e3.getVersion());
         assertEquals(e, e3);
