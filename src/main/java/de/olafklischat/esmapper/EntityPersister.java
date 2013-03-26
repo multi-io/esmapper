@@ -74,6 +74,7 @@ public class EntityPersister {
             IndexResponse res = irb.execute().actionGet();
             entity.setId(res.getId());
             entity.setVersion(res.getVersion());
+            entity.setLoaded(true);
         } catch (VersionConflictEngineException esVersionException) {
             throw new VersionConflictException("Version " + entity.getVersion() +
                     " was deprecated (" + esVersionException.getLocalizedMessage() + ")",
@@ -91,6 +92,7 @@ public class EntityPersister {
         T result = fromJSON(res.getSourceAsString(), classOfT);
         result.setId(res.getId());
         result.setVersion(res.getVersion());
+        result.setLoaded(true);
         return result;
     }
     

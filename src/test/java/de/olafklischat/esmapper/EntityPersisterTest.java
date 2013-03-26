@@ -36,20 +36,24 @@ public class EntityPersisterTest {
         e.setComment("foo bar");
         assertNull(e.getId());
         assertNull(e.getVersion());
+        assertFalse(e.isLoaded());
 
         ep.persist(e);
         
         assertNotNull(e.getId());
         assertEquals(new Long(1), e.getVersion());
+        assertTrue(e.isLoaded());
         
         TestEntity e2 = ep.findById(e.getId(), TestEntity.class);
         assertEquals(42, e2.getAge());
         assertEquals(e, e2);
+        assertTrue(e2.isLoaded());
         
         e.setAge(44);
         ep.persist(e);
         assertEquals(e2.getId(), e.getId()); //ID hasn't changed
         assertEquals(new Long(2), e.getVersion()); //version has incremented
+        assertTrue(e.isLoaded());
 
         TestEntity e3 = ep.findById(e.getId(), TestEntity.class);
         assertEquals(44, e3.getAge());
@@ -74,20 +78,24 @@ public class EntityPersisterTest {
         e.setComment("foo bar");
         assertNull(e.getId());
         assertNull(e.getVersion());
+        assertFalse(e.isLoaded());
 
         ep.persist(e);
         
         assertNotNull(e.getId());
         assertEquals(new Long(1), e.getVersion());
+        assertTrue(e.isLoaded());
         
         TestEntity e2 = ep.findById(e.getId(), TestEntity.class);
         assertEquals(e, e2);
+        assertTrue(e2.isLoaded());
         
         e.setName("hugo");
         e.setAge(44);
         ep.persist(e);
         assertEquals(e2.getId(), e.getId()); //ID hasn't changed
         assertEquals(new Long(2), e.getVersion()); //version has incremented
+        assertTrue(e.isLoaded());
 
         assertEquals(ep.findById(e.getId(), TestEntity.class), e);
         
@@ -102,11 +110,13 @@ public class EntityPersisterTest {
         ep.persist(e, true); //...unless we ignore version conflicts.
         assertEquals(e2.getId(), e.getId());
         assertEquals(new Long(3), e.getVersion());
+        assertTrue(e2.isLoaded());
 
         TestEntity e3 = ep.findById(e.getId(), TestEntity.class);
         assertEquals(46, e3.getAge());
         assertEquals(new Long(3), e3.getVersion());
         assertEquals(e, e3);
+        assertTrue(e3.isLoaded());
     }
     
     @After
