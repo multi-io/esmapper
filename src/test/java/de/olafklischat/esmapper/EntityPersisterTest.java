@@ -59,6 +59,12 @@ public class EntityPersisterTest {
         assertEquals(44, e3.getAge());
         assertEquals(new Long(2), e3.getVersion());
         assertEquals(e, e3);
+        
+        TestEntity e4 = new TestEntity();
+        e4.setId(e.getId());
+        ep.load(e4);
+        assertEquals(e, e4);
+        assertTrue(e4.isLoaded());
     }
     
     @Test

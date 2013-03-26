@@ -84,16 +84,35 @@ public class EntityPersister {
     }
 
     public <T extends Entity> T findById(String id, Class<T> classOfT) {
-        GetRequestBuilder grb = getEsClient().prepareGet("esdb", classOfT.getSimpleName(), id);
-        GetResponse res = grb.execute().actionGet();
-        if (!res.exists()) {
+        T result;
+        try {
+            result = classOfT.newInstance();
+        } catch (Exception e) {
+            throw new IllegalStateException("unable to instantiate entity class" + classOfT.getName(), e);
+        }
+        result.setId(id);
+        try {
+            load(result);
+        } catch (EntityNotFoundException e) {
             return null;
         }
-        T result = fromJSON(res.getSourceAsString(), classOfT);
-        result.setId(res.getId());
-        result.setVersion(res.getVersion());
-        result.setLoaded(true);
         return result;
+    }
+    
+    public <T extends Entity> void load(T entity) {
+        String id = entity.getId();
+        if (id == null) {
+            throw new IllegalArgumentException("can't load entity with null ID: " + entity);
+        }
+        GetRequestBuilder grb = getEsClient().prepareGet("esdb", entity.getClass().getSimpleName(), id);
+        GetResponse res = grb.execute().actionGet();
+        if (!res.exists()) {
+            throw new EntityNotFoundException("entity not found: type=" + entity.getClass() + ", id=" + id);
+        }
+        readJSON(res.getSourceAsString(), entity);
+        //entity.setId(res.getId());
+        entity.setVersion(res.getVersion());
+        entity.setLoaded(true);
     }
     
     private <T extends Entity> String toJSON(T entity) {
@@ -104,6 +123,11 @@ public class EntityPersister {
     private <T extends Entity> T fromJSON(String json, Class<T> classOfT) {
         JsonConverter jsc = new JsonConverter();
         return jsc.fromJson(json, classOfT);
+    }
+
+    private <T extends Entity> void readJSON(String json, T target) {
+        JsonConverter jsc = new JsonConverter();
+        jsc.readJson(json, target);
     }
 
 }
