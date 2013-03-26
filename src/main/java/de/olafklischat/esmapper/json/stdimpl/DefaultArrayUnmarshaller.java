@@ -37,6 +37,41 @@ public class DefaultArrayUnmarshaller implements JsonUnmarshaller {
         ////// 1. try to set() targetPath to an object that's an instance of targetPath's type (getNodeClass()),
         //////     *and* is a collection or array
         
+        Object targetObject = null;
+        try {
+            targetObject = targetPath.get();
+        } catch (Exception e) {
+            //assume no error -- may be IndexOutOfBoundsExeption due to empty array/list etc.
+        }
+        
+        if (null == targetObject) {
+            // targetPath hasn't been set() yet; we need to set it as described above.
+            // This is the normal case. targetObject may only be non-null for root paths,
+            // when the user called JsonConverter#readJson(JsonReader r, Object target)
+            // to fill an existing array/list
+            
+            targetObject = createInstance(r, targetPath, converter);
+            
+            //targetObject has been created successfully
+            targetPath.set(targetObject);
+        }
+        
+        ////// 2. fill the created target object with the array elements
+        r.beginArray();
+        int index = 0;
+        while (r.hasNext()) {
+            PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(index, targetObject), targetPath);
+            converter.readJson(r, elementPath);
+            index++;
+        }
+        r.endArray();
+        return true;
+    }
+    
+    
+    protected Object createInstance(JsonReader r, PropertyPath targetPath,
+            JsonConverter converter) throws IOException {
+
         Class<?> targetClass = targetPath.getNodeClass();
         ////TODO array properties are a bit nasty because we have to know the length in advance.
         //    (or re-allocate the array every time in ProertyPath.Node#set)
@@ -44,8 +79,8 @@ public class DefaultArrayUnmarshaller implements JsonUnmarshaller {
             throw new IllegalStateException("um... array properties not supported yet :-P (" + targetPath + ")");
         }
 
-        Object targetObject = null;
-        
+        Object targetObject;
+
         ////try to instantiate targetObject from @ImplClass annotation, if present
         if (null != (targetObject = tryCreateImplClassAnnotationInstance(targetPath, r))) {
             if (!(targetObject instanceof Collection<?> || targetObject.getClass().isArray())) {
@@ -85,20 +120,8 @@ public class DefaultArrayUnmarshaller implements JsonUnmarshaller {
         if (null == targetObject) {
             throw new IllegalArgumentException("failed to instantiate property " + targetPath);
         }
-
-        //targetObject has been created successfully
-        targetPath.set(targetObject);
         
-        ////// 2. fill the created target object with the array elements
-        r.beginArray();
-        int index = 0;
-        while (r.hasNext()) {
-            PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(index, targetObject), targetPath);
-            converter.readJson(r, elementPath);
-            index++;
-        }
-        r.endArray();
-        return true;
+        return targetObject;
     }
 
 

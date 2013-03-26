@@ -204,6 +204,49 @@ public class JsonConverterTest {
     }
     
     @Test
+    public void testWriteAnnotatedObject() {
+        JsonConverter c = new JsonConverter();
+        TestOrg bmw = new TestOrg("BMW", 120000, 35000);
+        TestOrg merc = new TestOrg("Mercedes", 456, 789);
+        TestCountry ger = new TestCountry("Germany", 82000000, Lists.newArrayList(bmw, merc), null);
+        ger.setIgnored("ignoreme");
+        assertEquals("ignoreme", ger.getIgnored());
+        JsonObject jso = c.toJsonElement(ger).getAsJsonObject();
+        assertEquals("Germany", jso.get("name").getAsString());
+        assertEquals(82000000, jso.get("population").getAsInt());
+        assertNull(jso.get("ignored"));
+    }
+
+    @Test
+    public void testReadIntoPreExistingObject() {
+        JsonConverter c = new JsonConverter();
+        TestCountry target = new TestCountry("Foo", 1234, null, null);
+        target.setIgnored("ignoreme");
+        c.readJson("" +
+                "{_class:\"de.olafklischat.esmapper.json.TestCountry\"," +
+                "name: \"Germany\"," +
+                "population: 82000000," +
+                "companies: [" +
+                    "{_class:\"de.olafklischat.esmapper.json.TestOrg\"," +
+                      "name:\"BMW\"," +
+                      "revenue:120000," +
+                      "nrOfEmployees: 35000}," +
+                    "{_class:\"de.olafklischat.esmapper.json.TestOrg\"," +
+                      "name:\"Mercedes\"," +
+                      "revenue:456," +
+                      "nrOfEmployees: 789} ]," +
+                "ignored:\"ignoredValue\" }",
+                target);
+        TestOrg bmw = new TestOrg("BMW", 120000, 35000);
+        TestOrg merc = new TestOrg("Mercedes", 456, 789);
+        TestCountry ger = new TestCountry("Germany", 82000000, Lists.newArrayList(bmw, merc), null);
+        ger.setIgnored("ignoreme");
+        assertEquals(ger, target);
+        assertEquals("ignoreme", target.getIgnored()); //should've been caught by the previous test, but check explicitly again
+        assertTrue(target.getCompanies() instanceof LinkedList<?>);
+    }
+
+    @Test
     public void testReadWithConversions() {
         String json = "" +
         		"{_class:\"de.olafklischat.esmapper.json.TestAutoConversionsBean\"," +

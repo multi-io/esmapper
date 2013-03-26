@@ -126,6 +126,14 @@ public class JsonConverter {
         }
     }
     
+    public void readJson(String json, Object target) {
+        try {
+            readJson(new StringReader(json), target);
+        } catch (IOException e) {
+            throw new IllegalStateException("JSON read error: " + e.getLocalizedMessage(), e);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public <T> T fromJson(Reader r) throws IOException {
         return (T) fromJson(r, Object.class);
@@ -141,6 +149,16 @@ public class JsonConverter {
         }
     }
     
+    public void readJson(Reader r, Object target) throws IOException {
+        JsonReader jsr = new JsonReader(r);
+        try {
+            jsr.setLenient(true);
+            readJson(jsr, target);
+        } finally {
+            jsr.close();
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public <T> T fromJson(JsonElement jse) throws IOException {
         return (T) fromJson(jse, Object.class);
@@ -156,6 +174,16 @@ public class JsonConverter {
         }
     }
     
+    public void readJson(JsonElement jse, Object target) throws IOException {
+        try {
+            JsonTreeReader jsr = new JsonTreeReader(jse);
+            jsr.setLenient(true);
+            readJson(jsr, target);
+        } catch (IOException e) {
+            throw new IllegalStateException("BUG (shouldn't happen)", e);
+        }
+    }
+
     @SuppressWarnings("unchecked")
     public <T> T fromJson(JsonReader r) throws IOException {
         return (T) fromJson(r, Object.class);
@@ -168,6 +196,12 @@ public class JsonConverter {
         return (T) rootPath.get();
     }
 
+    public void readJson(JsonReader r, Object target) throws IOException {
+        PropertyPath rootPath = new PropertyPath(new PropertyPath.Node(target.getClass()), null);
+        rootPath.set(target);
+        readJson(r, rootPath);
+    }
+    
     public void readJson(JsonReader r, PropertyPath targetPath) throws IOException {
         for (JsonUnmarshaller um : unmarshallers) {
             if (um.readJson(r, targetPath, this)) {

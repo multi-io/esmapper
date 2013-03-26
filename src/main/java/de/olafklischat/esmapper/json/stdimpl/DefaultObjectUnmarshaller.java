@@ -38,6 +38,11 @@ public class DefaultObjectUnmarshaller implements JsonUnmarshaller {
         //////     *and* is a map or bean
         
         Object targetObject = null;
+        try {
+            targetObject = targetPath.get();
+        } catch (Exception e) {
+            //assume no error -- may be IndexOutOfBoundsExeption due to empty array/list etc.
+        }
 
         ///we'll read the first key into this variable during targetObject instantiation,
         //  before looping over all the map elements in the JSON. Reason: we need to
@@ -45,68 +50,77 @@ public class DefaultObjectUnmarshaller implements JsonUnmarshaller {
         //  contain the name of the first regular property / map key to set
         String firstKey = null;
 
-        Class<?> targetClass = targetPath.getNodeClass();
-
-        //try to instantiate targetObject from @ImplClass annotation, if present
-        if (null != (targetObject = tryCreateImplClassAnnotationInstance(targetPath, r))) {
-            r.beginObject(); // skip over the { because we do it in the next alternative (below) too
-        }
-
-        //if that didn't work, try to instantiate the class specified in _class or _mapClass in the JSON (if present)
-        if (null == targetObject) {
-            //need to fetch the first key of the map to see if it is _class or _mapClass,
-            // in which case targetObject must become an instance of that.
-            r.beginObject();
-            if (r.hasNext()) {
-                firstKey = r.nextName();
-                if ("_class".equals(firstKey) || "_mapClass".equals(firstKey)) {
-                    if (r.peek() != JsonToken.STRING) {
-                        throw new IllegalStateException("" + targetPath + ": _class/_mapClass require a string value");
-                    }
-                    String className = r.nextString();
-                    firstKey = null;
-                    try {
-                        targetObject = Class.forName(className).newInstance();
-                    } catch (Exception e) {
-                        throw new IllegalStateException("" + targetPath +
-                                ": couldn't instantiate " + className + ": " + e.getLocalizedMessage(), e);
-                    }
-                }
+        if (null != targetObject) {
+            r.beginObject(); // skip over the { because we do it in the else branch too
+        } else {
+            // targetPath hasn't been set() yet; we need to set it as described above.
+            // This is the normal case. targetObject may only be non-null for root paths,
+            // when the user called JsonConverter#readJson(JsonReader r, Object target)
+            // to fill an existing object
+    
+            Class<?> targetClass = targetPath.getNodeClass();
+    
+            //try to instantiate targetObject from @ImplClass annotation, if present
+            if (null != (targetObject = tryCreateImplClassAnnotationInstance(targetPath, r))) {
+                r.beginObject(); // skip over the { because we do it in the next alternative (below) too
             }
-        }
-
-        //...if that didn't work, check if targetClass is some well-known interface for which we know a good implementation
-        if (null == targetObject) {
-            for (Class<?> declaredClass: defaultMapImplClasses.keySet()) {
-                if (targetClass.equals(declaredClass)) {
-                    Class<?> implClass = defaultMapImplClasses.get(declaredClass);
-                    try {
-                        targetObject = implClass.newInstance();
-                        break;
-                    } catch (Exception e) {
-                        throw new IllegalArgumentException("shouldn't happen", e);
+    
+            //if that didn't work, try to instantiate the class specified in _class or _mapClass in the JSON (if present)
+            if (null == targetObject) {
+                //need to fetch the first key of the map to see if it is _class or _mapClass,
+                // in which case targetObject must become an instance of that.
+                r.beginObject();
+                if (r.hasNext()) {
+                    firstKey = r.nextName();
+                    if ("_class".equals(firstKey) || "_mapClass".equals(firstKey)) {
+                        if (r.peek() != JsonToken.STRING) {
+                            throw new IllegalStateException("" + targetPath + ": _class/_mapClass require a string value");
+                        }
+                        String className = r.nextString();
+                        firstKey = null;
+                        try {
+                            targetObject = Class.forName(className).newInstance();
+                        } catch (Exception e) {
+                            throw new IllegalStateException("" + targetPath +
+                                    ": couldn't instantiate " + className + ": " + e.getLocalizedMessage(), e);
+                        }
                     }
                 }
             }
-        }
-        
-        //...if that didn't work either, try to instantiate the property class directly
-        if (null == targetObject) {
-            try {
-                targetObject = targetClass.newInstance();
-            } catch (Exception e) {
-                throw new IllegalStateException("" + targetPath + ": couldn't instantiate property directly: " +
-                            e.getLocalizedMessage(), e);
+    
+            //...if that didn't work, check if targetClass is some well-known interface for which we know a good implementation
+            if (null == targetObject) {
+                for (Class<?> declaredClass: defaultMapImplClasses.keySet()) {
+                    if (targetClass.equals(declaredClass)) {
+                        Class<?> implClass = defaultMapImplClasses.get(declaredClass);
+                        try {
+                            targetObject = implClass.newInstance();
+                            break;
+                        } catch (Exception e) {
+                            throw new IllegalArgumentException("shouldn't happen", e);
+                        }
+                    }
+                }
             }
+            
+            //...if that didn't work either, try to instantiate the property class directly
+            if (null == targetObject) {
+                try {
+                    targetObject = targetClass.newInstance();
+                } catch (Exception e) {
+                    throw new IllegalStateException("" + targetPath + ": couldn't instantiate property directly: " +
+                                e.getLocalizedMessage(), e);
+                }
+            }
+            
+            //...if that didn't work either, give up
+            if (null == targetObject) {
+                throw new IllegalArgumentException("failed to instantiate property " + targetPath);
+            }
+    
+            //targetObject has been created successfully
+            targetPath.set(targetObject);
         }
-        
-        //...if that didn't work either, give up
-        if (null == targetObject) {
-            throw new IllegalArgumentException("failed to instantiate property " + targetPath);
-        }
-
-        //targetObject has been created successfully
-        targetPath.set(targetObject);
 
         ////// 2. targetObject has been set() into targetPath, now fill it
         if (firstKey != null) {
