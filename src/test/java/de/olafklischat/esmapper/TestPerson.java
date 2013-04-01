@@ -2,15 +2,16 @@ package de.olafklischat.esmapper;
 
 import de.olafklischat.esmapper.Entity;
 
-public class TestEntity extends Entity {
+public class TestPerson extends Entity {
     private String name;
     private int age;
     private String comment;
+    private TestCity homeTown;
     
-    public TestEntity() {
+    public TestPerson() {
     }
     
-    public TestEntity(String name, int age, String comment) {
+    public TestPerson(String name, int age, String comment) {
         super();
         this.name = name;
         this.age = age;
@@ -35,6 +36,12 @@ public class TestEntity extends Entity {
     public void setComment(String comment) {
         this.comment = comment;
     }
+    public TestCity getHomeTown() {
+        return homeTown;
+    }
+    public void setHomeTown(TestCity homeTown) {
+        this.homeTown = homeTown;
+    }
 
     @Override
     public int hashCode() {
@@ -54,7 +61,7 @@ public class TestEntity extends Entity {
             return false;
         if (getClass() != obj.getClass())
             return false;
-        TestEntity other = (TestEntity) obj;
+        TestPerson other = (TestPerson) obj;
         if (age != other.age)
             return false;
         if (comment == null) {

@@ -1,5 +1,8 @@
 package de.olafklischat.esmapper;
 
+import java.io.IOException;
+
+import org.apache.log4j.Logger;
 import org.elasticsearch.action.get.GetRequestBuilder;
 import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequestBuilder;
@@ -9,13 +12,22 @@ import org.elasticsearch.index.engine.VersionConflictEngineException;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.node.NodeBuilder;
 
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
+import com.google.gson.stream.JsonWriter;
+
 import de.olafklischat.esmapper.Entity;
 import de.olafklischat.esmapper.json.JsonConverter;
+import de.olafklischat.esmapper.json.JsonMarshaller;
+import de.olafklischat.esmapper.json.JsonUnmarshaller;
+import de.olafklischat.esmapper.json.PropertyPath;
 
 public class EntityPersister {
+    
+    private static final Logger log = Logger.getLogger(EntityPersister.class);
 
     private Client esClient;
-
+    
     public void setEsClient(Client esClient) {
         this.esClient = esClient;
     }
@@ -117,17 +129,98 @@ public class EntityPersister {
     
     private <T extends Entity> String toJSON(T entity) {
         JsonConverter jsc = new JsonConverter();
+        JsonMapper m = new JsonMapper();
+        jsc.registerMarshaller(m);
+        jsc.registerUnmarshaller(m);
         return jsc.toJson(entity);
     }
     
+    @SuppressWarnings("unused")
     private <T extends Entity> T fromJSON(String json, Class<T> classOfT) {
         JsonConverter jsc = new JsonConverter();
+        JsonMapper m = new JsonMapper();
+        jsc.registerMarshaller(m);
+        jsc.registerUnmarshaller(m);
         return jsc.fromJson(json, classOfT);
     }
 
     private <T extends Entity> void readJSON(String json, T target) {
         JsonConverter jsc = new JsonConverter();
+        JsonMapper m = new JsonMapper();
+        jsc.registerMarshaller(m);
+        jsc.registerUnmarshaller(m);
         jsc.readJson(json, target);
+    }
+
+    protected class JsonMapper implements JsonMarshaller, JsonUnmarshaller {
+        @Override
+        public boolean writeJson(PropertyPath sourcePath, JsonWriter out,
+                JsonConverter context) throws IOException {
+            Object source = sourcePath.get();
+            if (!(source instanceof Entity)) {
+                //we only handle entities, leave everything else to the default handling
+                return false;
+            }
+            if (sourcePath.getLength() == 1) {
+                //we don't handle the root object, even if it is an entity (which it probably is)
+                return false;
+            }
+            Entity e = (Entity) source;
+            out.beginObject();
+            out.name("_id");
+            out.value(e.getId());
+            out.name("_type");
+            out.value(e.getClass().getCanonicalName());
+            out.endObject();
+            return true;
+        }
+        
+        @SuppressWarnings("unchecked")
+        @Override
+        public boolean readJson(JsonElement src, PropertyPath targetPath,
+                JsonConverter context) throws IOException {
+            Class<?> targetType = targetPath.getNodeClass();
+            if (! Entity.class.isAssignableFrom(targetType)) {
+                //we only handle entities, leave everything else to the default handling
+                return false;
+            }
+            if (targetPath.getLength() == 1) {
+                //we don't handle the root object, even if it is an entity (which it probably is)
+                return false;
+            }
+            if (! src.isJsonObject()) {
+                return false;
+            }
+            JsonObject jso = src.getAsJsonObject();
+            if (! jso.has("_type")) {
+                //is this an error?
+                log.warn("" + targetPath + ": JSON contains an object that's not a reference. Embedded entity?");
+                return false;
+            }
+            String parsedType = jso.get("_type").getAsString();
+            Class<? extends Entity> parsedClass;
+            try {
+                parsedClass = (Class<? extends Entity>) Class.forName(parsedType);
+            } catch (Exception e) {
+                throw new IllegalStateException("" + targetPath + ": couldn't identify class referenced as _type in JSON (" +
+                        parsedType + ")", e);
+            }
+            if (! targetType.isAssignableFrom(parsedClass)) {
+                throw new IllegalStateException("" + targetPath + ": incompatible _type in JSON (" +
+                        parsedClass + " <-> " + targetType + ")");
+            }
+            Entity instance;
+            try {
+                instance = parsedClass.newInstance();
+            } catch (Exception e) {
+                throw new IllegalStateException("" + targetPath + ": couldn't instatiate class referenced as _type in JSON (" +
+                        parsedClass + ")", e);
+            }
+            String parsedId = jso.get("_id").getAsString();
+            instance.setId(parsedId);
+            targetPath.set(instance);
+            return true;
+        }
     }
 
 }

@@ -79,6 +79,14 @@ public class PropertyPath {
         head.set(value);
     }
     
+    public int getLength() {
+        if (tail == null) {
+            return 1;
+        } else {
+            return 1 + tail.getLength();
+        }
+    }
+    
     @Override
     public String toString() {
         StringBuffer result = new StringBuffer();
@@ -193,7 +201,7 @@ public class PropertyPath {
             return baseObject;
         }
         
-        public void setPathToMe(PropertyPath pathToMe) {
+        private void setPathToMe(PropertyPath pathToMe) {
             this.pathToMe = pathToMe;
         }
         
