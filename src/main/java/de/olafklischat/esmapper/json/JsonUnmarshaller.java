@@ -2,8 +2,8 @@ package de.olafklischat.esmapper.json;
 
 import java.io.IOException;
 
-import com.google.gson.stream.JsonReader;
+import com.google.gson.JsonElement;
 
 public interface JsonUnmarshaller {
-    boolean readJson(JsonReader r, PropertyPath targetPath, JsonConverter context) throws IOException;
+    boolean readJson(JsonElement source, PropertyPath targetPath, JsonConverter context) throws IOException;
 }

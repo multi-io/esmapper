@@ -8,8 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
+import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import java.util.HashSet;
 
 import de.olafklischat.esmapper.annotations.ImplClass;
@@ -29,9 +29,9 @@ public class DefaultArrayUnmarshaller implements JsonUnmarshaller {
     }
 
     @Override
-    public boolean readJson(JsonReader r, PropertyPath targetPath,
+    public boolean readJson(JsonElement r, PropertyPath targetPath,
             JsonConverter converter) throws IOException {
-        if (r.peek() != JsonToken.BEGIN_ARRAY) {
+        if (!r.isJsonArray()) {
             return false;
         }
         ////// 1. try to set() targetPath to an object that's an instance of targetPath's type (getNodeClass()),
@@ -57,19 +57,18 @@ public class DefaultArrayUnmarshaller implements JsonUnmarshaller {
         }
         
         ////// 2. fill the created target object with the array elements
-        r.beginArray();
+        JsonArray srcArray = r.getAsJsonArray();
         int index = 0;
-        while (r.hasNext()) {
+        for (JsonElement elt : srcArray) {
             PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(index, targetObject), targetPath);
-            converter.readJson(r, elementPath);
+            converter.readJson(elt, elementPath);
             index++;
         }
-        r.endArray();
         return true;
     }
     
     
-    protected Object createInstance(JsonReader r, PropertyPath targetPath,
+    protected Object createInstance(JsonElement r, PropertyPath targetPath,
             JsonConverter converter) throws IOException {
 
         Class<?> targetClass = targetPath.getNodeClass();
@@ -125,7 +124,7 @@ public class DefaultArrayUnmarshaller implements JsonUnmarshaller {
     }
 
 
-    private Object tryCreateImplClassAnnotationInstance(PropertyPath target, JsonReader r) throws IOException {
+    private Object tryCreateImplClassAnnotationInstance(PropertyPath target, JsonElement r) throws IOException {
         ImplClass ic = target.getAnnotation(ImplClass.class);
         if (null != ic) {
             try {

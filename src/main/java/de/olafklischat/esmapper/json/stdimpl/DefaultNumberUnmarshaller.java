@@ -2,8 +2,8 @@ package de.olafklischat.esmapper.json.stdimpl;
 
 import java.io.IOException;
 
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonPrimitive;
 
 import de.olafklischat.esmapper.json.JsonConverter;
 import de.olafklischat.esmapper.json.JsonUnmarshaller;
@@ -12,19 +12,24 @@ import de.olafklischat.esmapper.json.PropertyPath;
 public class DefaultNumberUnmarshaller implements JsonUnmarshaller {
 
     @Override
-    public boolean readJson(JsonReader r, PropertyPath targetPath,
+    public boolean readJson(JsonElement r, PropertyPath targetPath,
             JsonConverter converter) throws IOException {
-        if (r.peek() != JsonToken.NUMBER) {
+        if (! r.isJsonPrimitive()) {
             return false;
         }
+        JsonPrimitive jsp = r.getAsJsonPrimitive();
+        if (! jsp.isNumber()) {
+            return false;
+        }
+        String jsonNum = jsp.toString();
         Number fromJson;
         try {
-            fromJson = r.nextInt();
+            fromJson = Integer.valueOf(jsonNum);
         } catch (NumberFormatException e) {
             try {
-                fromJson = r.nextLong();
+                fromJson = Long.valueOf(jsonNum);
             } catch (NumberFormatException e2) {
-                fromJson = r.nextDouble();
+                fromJson = Double.valueOf(jsonNum);
             }
         }
         targetPath.set(convertNumber(fromJson, targetPath.getNodeClass()));

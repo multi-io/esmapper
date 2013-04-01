@@ -1,6 +1,9 @@
 package de.olafklischat.esmapper.json;
 
-import static org.junit.Assert.*;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -19,9 +22,9 @@ import org.junit.Test;
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Ints;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 
 public class JsonConverterTest {
@@ -329,12 +332,12 @@ public class JsonConverterTest {
     
     private static class TestOrgFromStringUnmarshaller implements JsonUnmarshaller {
         @Override
-        public boolean readJson(JsonReader r, PropertyPath targetPath,
+        public boolean readJson(JsonElement r, PropertyPath targetPath,
                 JsonConverter context) throws IOException {
             if (targetPath.getNodeClass() != TestOrg.class) {
                 return false;
             }
-            String orgStr = r.nextString();
+            String orgStr = r.getAsString();
             StringTokenizer st = new StringTokenizer(orgStr, ",");
             TestOrg org = new TestOrg(st.nextToken(), Integer.valueOf(st.nextToken()), Integer.valueOf(st.nextToken()));
             targetPath.set(org);

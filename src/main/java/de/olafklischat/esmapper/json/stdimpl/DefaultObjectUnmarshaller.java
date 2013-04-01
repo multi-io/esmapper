@@ -8,8 +8,8 @@ import java.util.TreeMap;
 
 import com.google.common.collect.BiMap;
 import com.google.common.collect.HashBiMap;
-import com.google.gson.stream.JsonReader;
-import com.google.gson.stream.JsonToken;
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 import de.olafklischat.esmapper.annotations.Ignore;
 import de.olafklischat.esmapper.annotations.ImplClass;
@@ -29,9 +29,9 @@ public class DefaultObjectUnmarshaller implements JsonUnmarshaller {
     }
     
     @Override
-    public boolean readJson(JsonReader r, PropertyPath targetPath,
+    public boolean readJson(JsonElement r, PropertyPath targetPath,
             JsonConverter converter) throws IOException {
-        if (r.peek() != JsonToken.BEGIN_OBJECT) {
+        if (! r.isJsonObject()) {
             return false;
         }
         ////// 1. try to set() targetPath to an object that's an instance of targetPath's type (getNodeClass()),
@@ -43,16 +43,10 @@ public class DefaultObjectUnmarshaller implements JsonUnmarshaller {
         } catch (Exception e) {
             //assume no error -- may be IndexOutOfBoundsExeption due to empty array/list etc.
         }
+        
+        JsonObject srcObj = r.getAsJsonObject();
 
-        ///we'll read the first key into this variable during targetObject instantiation,
-        //  before looping over all the map elements in the JSON. Reason: we need to
-        //  check for _class / _mapClass keys. If those aren't present, firstKey will
-        //  contain the name of the first regular property / map key to set
-        String firstKey = null;
-
-        if (null != targetObject) {
-            r.beginObject(); // skip over the { because we do it in the else branch too
-        } else {
+        if (null == targetObject) {
             // targetPath hasn't been set() yet; we need to set it as described above.
             // This is the normal case. targetObject may only be non-null for root paths,
             // when the user called JsonConverter#readJson(JsonReader r, Object target)
@@ -61,29 +55,20 @@ public class DefaultObjectUnmarshaller implements JsonUnmarshaller {
             Class<?> targetClass = targetPath.getNodeClass();
     
             //try to instantiate targetObject from @ImplClass annotation, if present
-            if (null != (targetObject = tryCreateImplClassAnnotationInstance(targetPath, r))) {
-                r.beginObject(); // skip over the { because we do it in the next alternative (below) too
-            }
+            targetObject = tryCreateImplClassAnnotationInstance(targetPath, r);
     
             //if that didn't work, try to instantiate the class specified in _class or _mapClass in the JSON (if present)
             if (null == targetObject) {
-                //need to fetch the first key of the map to see if it is _class or _mapClass,
-                // in which case targetObject must become an instance of that.
-                r.beginObject();
-                if (r.hasNext()) {
-                    firstKey = r.nextName();
-                    if ("_class".equals(firstKey) || "_mapClass".equals(firstKey)) {
-                        if (r.peek() != JsonToken.STRING) {
-                            throw new IllegalStateException("" + targetPath + ": _class/_mapClass require a string value");
-                        }
-                        String className = r.nextString();
-                        firstKey = null;
-                        try {
-                            targetObject = Class.forName(className).newInstance();
-                        } catch (Exception e) {
-                            throw new IllegalStateException("" + targetPath +
-                                    ": couldn't instantiate " + className + ": " + e.getLocalizedMessage(), e);
-                        }
+                JsonElement className = srcObj.get("_class");
+                if (null == className) {
+                    className = srcObj.get("_mapClass");
+                }
+                if (null != className) {
+                    try {
+                        targetObject = Class.forName(className.getAsString()).newInstance();
+                    } catch (Exception e) {
+                        throw new IllegalStateException("" + targetPath +
+                                ": couldn't instantiate " + className + ": " + e.getLocalizedMessage(), e);
                     }
                 }
             }
@@ -123,40 +108,22 @@ public class DefaultObjectUnmarshaller implements JsonUnmarshaller {
         }
 
         ////// 2. targetObject has been set() into targetPath, now fill it
-        if (firstKey != null) {
-            //firstKey is a regular property / map key, and r is located at the beginning of the value
-            if (firstKey.startsWith("_")) { //skip any values whose keys start with "_"
-                r.skipValue();
-            } else {
-                //else, read the value and set it into targetObject
-                PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(firstKey, targetObject), targetPath);
-                if (elementPath.getAnnotation(Ignore.class) == null) {
-                    converter.readJson(r, elementPath);
-                } else {
-                    r.skipValue();
-                }
-            }
-        }
-        while (r.hasNext()) {
-            String key = r.nextName();
+        for (Map.Entry<String, JsonElement> en : srcObj.entrySet()) {
+            String key = en.getKey();
             if (key.startsWith("_")) { //skip any values whose keys start with "_"
-                r.skipValue();
-            } else {
-                //else, read the value and set it into targetObject
-                PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(key, targetObject), targetPath);
-                if (elementPath.getAnnotation(Ignore.class) == null) {
-                    converter.readJson(r, elementPath);
-                } else {
-                    r.skipValue();
-                }
+                continue;
+            }
+            JsonElement value = en.getValue();
+            PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(key, targetObject), targetPath);
+            if (elementPath.getAnnotation(Ignore.class) == null) {
+                converter.readJson(value, elementPath);
             }
         }
-        r.endObject();
         return true;
     }
 
 
-    private Object tryCreateImplClassAnnotationInstance(PropertyPath target, JsonReader r) throws IOException {
+    private Object tryCreateImplClassAnnotationInstance(PropertyPath target, JsonElement r) throws IOException {
         ImplClass ic = target.getAnnotation(ImplClass.class);
         if (null != ic) {
             try {

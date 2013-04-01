@@ -9,7 +9,7 @@ import java.util.Deque;
 import java.util.LinkedList;
 
 import com.google.gson.JsonElement;
-import com.google.gson.internal.bind.JsonTreeReader;
+import com.google.gson.internal.Streams;
 import com.google.gson.internal.bind.JsonTreeWriter;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
@@ -153,7 +153,7 @@ public class JsonConverter {
         JsonReader jsr = new JsonReader(r);
         try {
             jsr.setLenient(true);
-            readJson(jsr, target);
+            readJson(Streams.parse(jsr), target);
         } finally {
             jsr.close();
         }
@@ -164,24 +164,17 @@ public class JsonConverter {
         return (T) fromJson(jse, Object.class);
     }
 
+    @SuppressWarnings("unchecked")
     public <T> T fromJson(JsonElement jse, Class<T> clazz) throws IOException {
-        try {
-            JsonTreeReader jsr = new JsonTreeReader(jse);
-            jsr.setLenient(true);
-            return fromJson(jsr, clazz);
-        } catch (IOException e) {
-            throw new IllegalStateException("BUG (shouldn't happen)", e);
-        }
+        PropertyPath rootPath = new PropertyPath(new PropertyPath.Node(clazz), null);
+        readJson(jse, rootPath);
+        return (T) rootPath.get();
     }
     
     public void readJson(JsonElement jse, Object target) throws IOException {
-        try {
-            JsonTreeReader jsr = new JsonTreeReader(jse);
-            jsr.setLenient(true);
-            readJson(jsr, target);
-        } catch (IOException e) {
-            throw new IllegalStateException("BUG (shouldn't happen)", e);
-        }
+        PropertyPath rootPath = new PropertyPath(new PropertyPath.Node(target.getClass()), null);
+        rootPath.set(target);
+        readJson(jse, rootPath);
     }
 
     @SuppressWarnings("unchecked")
@@ -192,19 +185,14 @@ public class JsonConverter {
     @SuppressWarnings("unchecked")
     public <T> T fromJson(JsonReader r, Class<T> clazz) throws IOException {
         PropertyPath rootPath = new PropertyPath(new PropertyPath.Node(clazz), null);
-        readJson(r, rootPath);
+        JsonElement source = Streams.parse(r);
+        readJson(source, rootPath);
         return (T) rootPath.get();
     }
 
-    public void readJson(JsonReader r, Object target) throws IOException {
-        PropertyPath rootPath = new PropertyPath(new PropertyPath.Node(target.getClass()), null);
-        rootPath.set(target);
-        readJson(r, rootPath);
-    }
-    
-    public void readJson(JsonReader r, PropertyPath targetPath) throws IOException {
+    public void readJson(JsonElement source, PropertyPath targetPath) throws IOException {
         for (JsonUnmarshaller um : unmarshallers) {
-            if (um.readJson(r, targetPath, this)) {
+            if (um.readJson(source, targetPath, this)) {
                 break;
             }
         }
