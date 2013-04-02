@@ -1,10 +1,14 @@
 package de.olafklischat.esmapper;
 
+import java.util.Collection;
+
 import de.olafklischat.esmapper.Entity;
 
 public class TestCity extends Entity {
     private String name;
     private int population;
+    private TestPerson mayor;
+    private Collection<TestCity> sisterCities;
     
     public TestCity() {
     }
@@ -29,6 +33,22 @@ public class TestCity extends Entity {
 
     public void setPopulation(int population) {
         this.population = population;
+    }
+    
+    public TestPerson getMayor() {
+        return mayor;
+    }
+    
+    public void setMayor(TestPerson mayor) {
+        this.mayor = mayor;
+    }
+    
+    public Collection<TestCity> getSisterCities() {
+        return sisterCities;
+    }
+    
+    public void setSisterCities(Collection<TestCity> sisterCities) {
+        this.sisterCities = sisterCities;
     }
 
     @Override

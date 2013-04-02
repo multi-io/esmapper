@@ -129,30 +129,38 @@ public class EntityPersister {
     
     private <T extends Entity> String toJSON(T entity) {
         JsonConverter jsc = new JsonConverter();
-        JsonMapper m = new JsonMapper();
+        JsonMarshallerImpl m = new JsonMarshallerImpl();
+        m.setSubObjectsIgnoreVersion(true);
         jsc.registerMarshaller(m);
-        jsc.registerUnmarshaller(m);
         return jsc.toJson(entity);
     }
     
     @SuppressWarnings("unused")
     private <T extends Entity> T fromJSON(String json, Class<T> classOfT) {
         JsonConverter jsc = new JsonConverter();
-        JsonMapper m = new JsonMapper();
-        jsc.registerMarshaller(m);
-        jsc.registerUnmarshaller(m);
+        JsonUnmarshallerImpl um = new JsonUnmarshallerImpl();
+        jsc.registerUnmarshaller(um);
         return jsc.fromJson(json, classOfT);
     }
 
     private <T extends Entity> void readJSON(String json, T target) {
         JsonConverter jsc = new JsonConverter();
-        JsonMapper m = new JsonMapper();
-        jsc.registerMarshaller(m);
-        jsc.registerUnmarshaller(m);
+        JsonUnmarshallerImpl um = new JsonUnmarshallerImpl();
+        jsc.registerUnmarshaller(um);
         jsc.readJson(json, target);
     }
 
-    protected class JsonMapper implements JsonMarshaller, JsonUnmarshaller {
+    protected class JsonMarshallerImpl implements JsonMarshaller {
+        private boolean subObjectsIgnoreVersion = false;
+
+        public boolean isSubObjectsIgnoreVersion() {
+            return subObjectsIgnoreVersion;
+        }
+        
+        public void setSubObjectsIgnoreVersion(boolean subObjectsIgnoreVersion) {
+            this.subObjectsIgnoreVersion = subObjectsIgnoreVersion;
+        }
+        
         @Override
         public boolean writeJson(PropertyPath sourcePath, JsonWriter out,
                 JsonConverter context) throws IOException {
@@ -166,6 +174,13 @@ public class EntityPersister {
                 return false;
             }
             Entity e = (Entity) source;
+            
+            //TODO: this is probably not very robust:
+            // - it is prone to endless recursion
+            // - it uses a different JsonMarshallerImpl
+            // - also think about error handling
+            persist(e, subObjectsIgnoreVersion);
+
             out.beginObject();
             out.name("_id");
             out.value(e.getId());
@@ -174,6 +189,10 @@ public class EntityPersister {
             out.endObject();
             return true;
         }
+    }
+    
+    
+    protected class JsonUnmarshallerImpl implements JsonUnmarshaller {
         
         @SuppressWarnings("unchecked")
         @Override
@@ -223,4 +242,5 @@ public class EntityPersister {
         }
     }
 
+    
 }

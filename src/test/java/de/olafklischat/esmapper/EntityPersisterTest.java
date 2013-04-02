@@ -1,10 +1,12 @@
 package de.olafklischat.esmapper;
 
+import org.elasticsearch.common.collect.Lists;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.node.NodeBuilder;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+
 import static org.junit.Assert.*;
 
 public class EntityPersisterTest {
@@ -125,7 +127,7 @@ public class EntityPersisterTest {
     }
     
     @Test
-    public void testStoreLoadRelationNoFollow() {
+    public void testStoreLoadRelationNoCascade() {
         TestCity c = new TestCity("Berlin", 3500000);
         ep.persist(c);
         assertNotNull(c.getId());
@@ -145,6 +147,44 @@ public class EntityPersisterTest {
         assertEquals(c, c2);
     }
     
+    @Test
+    public void testStoreRelationFullCascade() {
+        TestCity liv = new TestCity("Liverpool", 12345);
+        TestCity ldn = new TestCity("London", 678);
+        TestCity mch = new TestCity("Manchester", 9012);
+        liv.setSisterCities(Lists.newArrayList(ldn, mch));
+        //mch.setSisterCities(Lists.newArrayList(liv));  //TODO: triggers endless recursion right now
+        TestPerson paul = new TestPerson("paul", 65, "nice guy");
+        TestPerson john = new TestPerson("john", 67, "dead guy");
+        //TestPerson george = new TestPerson("george", 69, "one hit wonder");
+        paul.setHomeTown(liv);
+        liv.setMayor(john);
+        //george.setHomeTown(mch);
+        
+        assertFalse(paul.isLoaded());
+        assertNull(paul.getId());
+        assertFalse(john.isLoaded());
+        assertNull(john.getId());
+        assertFalse(liv.isLoaded());
+        assertFalse(ldn.isLoaded());
+        assertNull(ldn.getId());
+        
+        ep.persist(paul);
+        
+        assertTrue(paul.isLoaded());
+        assertNotNull(paul.getId());
+        assertTrue(john.isLoaded());
+        assertNotNull(john.getId());
+        assertTrue(liv.isLoaded());
+        assertTrue(ldn.isLoaded());
+        assertNotNull(ldn.getId());
+
+        TestPerson paul2 = ep.findById(paul.getId(), TestPerson.class);
+        assertEquals(paul, paul2);
+        ep.load(paul2.getHomeTown());
+        assertEquals(liv, paul2.getHomeTown());
+    }
+
     @After
     public void tearDown() throws Exception {
     }
