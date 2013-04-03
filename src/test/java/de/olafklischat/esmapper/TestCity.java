@@ -79,4 +79,9 @@ public class TestCity extends Entity {
         return true;
     }
 
+    @Override
+    public String toString() {
+        return getName();
+    }
+
 }

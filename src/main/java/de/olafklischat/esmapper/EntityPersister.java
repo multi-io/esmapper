@@ -1,6 +1,8 @@
 package de.olafklischat.esmapper;
 
 import java.io.IOException;
+import java.util.LinkedList;
+import java.util.Set;
 
 import org.apache.log4j.Logger;
 import org.elasticsearch.action.get.GetRequestBuilder;
@@ -8,10 +10,13 @@ import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.action.index.IndexRequestBuilder;
 import org.elasticsearch.action.index.IndexResponse;
 import org.elasticsearch.client.Client;
+import org.elasticsearch.common.collect.IdentityHashSet;
+import org.elasticsearch.common.collect.Lists;
 import org.elasticsearch.index.engine.VersionConflictEngineException;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.node.NodeBuilder;
 
+import com.google.common.base.Joiner;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.stream.JsonWriter;
@@ -63,38 +68,11 @@ public class EntityPersister {
      * @return
      */
     public <T extends Entity> T persist(T entity, boolean ignoreVersion) {
-        String prevId = entity.getId();
-        Long prevVersion = entity.getVersion();
-        if ((prevId == null) != (prevVersion == null)) {
-            throw new IllegalStateException("persisting a non-new object without a version, or a new object with a version, is not supported");
-        }
-        IndexRequestBuilder irb = getEsClient().prepareIndex();
-        if (prevId != null) {
-            irb.setId(prevId);
-            if (!ignoreVersion) {
-                irb.setVersion(prevVersion);
-            }
-            irb.setCreate(false);
-        } else {
-            //TODO: irb.setId(generateUniqueId()); to avoid ID autogeneration by ES
-            irb.setCreate(true);
-        }
-        irb.setIndex("esdb");
-        irb.setType(entity.getClass().getSimpleName());
-        irb.setSource(toJSON(entity));
-        try {
-            IndexResponse res = irb.execute().actionGet();
-            entity.setId(res.getId());
-            entity.setVersion(res.getVersion());
-            entity.setLoaded(true);
-        } catch (VersionConflictEngineException esVersionException) {
-            throw new VersionConflictException("Version " + entity.getVersion() +
-                    " was deprecated (" + esVersionException.getLocalizedMessage() + ")",
-                    esVersionException);
-        }
-        return entity;
+        Persister p = new Persister();
+        p.setSubObjectsIgnoreVersion(true);  //TODO make configurable
+        return p.persist(entity, ignoreVersion);
     }
-
+    
     public <T extends Entity> T findById(String id, Class<T> classOfT) {
         T result;
         try {
@@ -127,14 +105,6 @@ public class EntityPersister {
         entity.setLoaded(true);
     }
     
-    private <T extends Entity> String toJSON(T entity) {
-        JsonConverter jsc = new JsonConverter();
-        JsonMarshallerImpl m = new JsonMarshallerImpl();
-        m.setSubObjectsIgnoreVersion(true);
-        jsc.registerMarshaller(m);
-        return jsc.toJson(entity);
-    }
-    
     @SuppressWarnings("unused")
     private <T extends Entity> T fromJSON(String json, Class<T> classOfT) {
         JsonConverter jsc = new JsonConverter();
@@ -150,8 +120,10 @@ public class EntityPersister {
         jsc.readJson(json, target);
     }
 
-    protected class JsonMarshallerImpl implements JsonMarshaller {
+    protected class Persister implements JsonMarshaller {
         private boolean subObjectsIgnoreVersion = false;
+        private final LinkedList<PropertyPath> entitiesStack = new LinkedList<PropertyPath>();
+        private final Set<Entity> seenEntities = new IdentityHashSet<Entity>();
 
         public boolean isSubObjectsIgnoreVersion() {
             return subObjectsIgnoreVersion;
@@ -161,6 +133,47 @@ public class EntityPersister {
             this.subObjectsIgnoreVersion = subObjectsIgnoreVersion;
         }
         
+        public <T extends Entity> T persist(T entity, boolean ignoreVersion) {
+            String prevId = entity.getId();
+            Long prevVersion = entity.getVersion();
+            if ((prevId == null) != (prevVersion == null)) {
+                throw new IllegalStateException("persisting a non-new object without a version, or a new object with a version, is not supported");
+            }
+            
+            if (log.isDebugEnabled()) {
+                log.debug("persisting: " + Joiner.on("=>").join(Lists.reverse(entitiesStack)) + " (" + entity + ")");
+            }
+            
+            JsonConverter jsc = new JsonConverter();
+            jsc.registerMarshaller(this);
+            String json = jsc.toJson(entity);
+            
+            IndexRequestBuilder irb = getEsClient().prepareIndex();
+            if (prevId != null) {
+                irb.setId(prevId);
+                if (!ignoreVersion) {
+                    irb.setVersion(prevVersion);
+                }
+                irb.setCreate(false);
+            } else {
+                irb.setCreate(true);
+            }
+            irb.setIndex("esdb");
+            irb.setType(entity.getClass().getSimpleName());
+            irb.setSource(json);
+            try {
+                IndexResponse res = irb.execute().actionGet();
+                entity.setId(res.getId());
+                entity.setVersion(res.getVersion());
+                entity.setLoaded(true);
+            } catch (VersionConflictEngineException esVersionException) {
+                throw new VersionConflictException("Version " + entity.getVersion() +
+                        " was deprecated (" + esVersionException.getLocalizedMessage() + ")",
+                        esVersionException);
+            }
+            return entity;
+        }
+
         @Override
         public boolean writeJson(PropertyPath sourcePath, JsonWriter out,
                 JsonConverter context) throws IOException {
@@ -170,16 +183,25 @@ public class EntityPersister {
                 return false;
             }
             if (sourcePath.getLength() == 1) {
-                //we don't handle the root object, even if it is an entity (which it probably is)
+                //we don't handle a root object, even if it is an entity (which it probably is)
                 return false;
             }
             Entity e = (Entity) source;
             
-            //TODO: this is probably not very robust:
-            // - it is prone to endless recursion
-            // - it uses a different JsonMarshallerImpl
-            // - also think about error handling
-            persist(e, subObjectsIgnoreVersion);
+            if (! seenEntities.contains(e)) {
+                seenEntities.add(e);
+
+                //TODO: recursion may be less robust
+                entitiesStack.push(sourcePath);
+                try {
+                    //TODO: configurability:
+                    // - option to only persist non-loaded (new) entities (i.e. no updates)
+                    // - ^^ but beware: even non-new entities may reference new ones
+                    persist(e, subObjectsIgnoreVersion);
+                } finally {
+                    entitiesStack.pop();
+                }
+            }
 
             out.beginObject();
             out.name("_id");

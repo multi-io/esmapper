@@ -153,7 +153,7 @@ public class EntityPersisterTest {
         TestCity ldn = new TestCity("London", 678);
         TestCity mch = new TestCity("Manchester", 9012);
         liv.setSisterCities(Lists.newArrayList(ldn, mch));
-        //mch.setSisterCities(Lists.newArrayList(liv));  //TODO: triggers endless recursion right now
+        mch.setSisterCities(Lists.newArrayList(liv));
         TestPerson paul = new TestPerson("paul", 65, "nice guy");
         TestPerson john = new TestPerson("john", 67, "dead guy");
         //TestPerson george = new TestPerson("george", 69, "one hit wonder");

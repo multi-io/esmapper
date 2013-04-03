@@ -76,4 +76,10 @@ public class TestPerson extends Entity {
             return false;
         return true;
     }
+
+    @Override
+    public String toString() {
+        return getName();
+    }
+
 }
