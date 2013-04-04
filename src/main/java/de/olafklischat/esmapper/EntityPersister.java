@@ -90,36 +90,10 @@ public class EntityPersister {
     }
     
     public <T extends Entity> void load(T entity) {
-        String id = entity.getId();
-        if (id == null) {
-            throw new IllegalArgumentException("can't load entity with null ID: " + entity);
-        }
-        GetRequestBuilder grb = getEsClient().prepareGet("esdb", entity.getClass().getSimpleName(), id);
-        GetResponse res = grb.execute().actionGet();
-        if (!res.exists()) {
-            throw new EntityNotFoundException("entity not found: type=" + entity.getClass() + ", id=" + id);
-        }
-        readJSON(res.getSourceAsString(), entity);
-        //entity.setId(res.getId());
-        entity.setVersion(res.getVersion());
-        entity.setLoaded(true);
+        Loader l = new Loader();
+        l.load(entity);
     }
     
-    @SuppressWarnings("unused")
-    private <T extends Entity> T fromJSON(String json, Class<T> classOfT) {
-        JsonConverter jsc = new JsonConverter();
-        JsonUnmarshallerImpl um = new JsonUnmarshallerImpl();
-        jsc.registerUnmarshaller(um);
-        return jsc.fromJson(json, classOfT);
-    }
-
-    private <T extends Entity> void readJSON(String json, T target) {
-        JsonConverter jsc = new JsonConverter();
-        JsonUnmarshallerImpl um = new JsonUnmarshallerImpl();
-        jsc.registerUnmarshaller(um);
-        jsc.readJson(json, target);
-    }
-
     protected class Persister implements JsonMarshaller {
         private boolean subObjectsIgnoreVersion = false;
         private final LinkedList<PropertyPath> entitiesStack = new LinkedList<PropertyPath>();
@@ -214,7 +188,25 @@ public class EntityPersister {
     }
     
     
-    protected class JsonUnmarshallerImpl implements JsonUnmarshaller {
+    protected class Loader implements JsonUnmarshaller {
+        
+        public <T extends Entity> void load(T entity) {
+            String id = entity.getId();
+            if (id == null) {
+                throw new IllegalArgumentException("can't load entity with null ID: " + entity);
+            }
+            GetRequestBuilder grb = getEsClient().prepareGet("esdb", entity.getClass().getSimpleName(), id);
+            GetResponse res = grb.execute().actionGet();
+            if (!res.exists()) {
+                throw new EntityNotFoundException("entity not found: type=" + entity.getClass() + ", id=" + id);
+            }
+            JsonConverter jsc = new JsonConverter();
+            jsc.registerUnmarshaller(this);
+            jsc.readJson(res.getSourceAsString(), entity);
+            //entity.setId(res.getId());
+            entity.setVersion(res.getVersion());
+            entity.setLoaded(true);
+        }
         
         @SuppressWarnings("unchecked")
         @Override
