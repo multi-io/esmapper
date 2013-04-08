@@ -1,34 +1,44 @@
 package de.olafklischat.esmapper;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
 import org.elasticsearch.common.collect.Lists;
 import org.elasticsearch.node.Node;
-import org.elasticsearch.node.NodeBuilder;
 import org.junit.After;
+import org.junit.AfterClass;
 import org.junit.Before;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import static org.junit.Assert.*;
-
 public class EntityPersisterTest {
 
-    @SuppressWarnings("unused")
-    private Node localDB;
+    private static ESRunner esRunner;
+    private static Node esClient;
+
     private EntityPersister ep;
+    
+    @BeforeClass
+    public static void classSetUp() throws Exception {
+        esRunner = new ESRunner(6200);
+        esRunner.setClusterName("esmapper_testcluster");
+        if (! esRunner.isRunning()) {
+            esRunner.startLocally();
+        }
+        esClient = esRunner.createClient();
+    }
     
     @Before
     public void setUp() throws Exception {
-        NodeBuilder localDBBuilder = NodeBuilder.nodeBuilder().local(true).client(false).data(true);
-        localDBBuilder.settings().put("index.store.type", "memory"); //TODO doesn't work -- it still creates the index in the FS
-        assertEquals("memory", localDBBuilder.settings().get("index.store.type"));
-        
-        localDB = localDBBuilder.node();
-
-        Node localClient = NodeBuilder.nodeBuilder().local(true).client(true).node();
         ep = new EntityPersister();
-        ep.setEsClient(localClient.client());
+        ep.setEsClient(esClient.client());
     }
     
     @Test
@@ -225,6 +235,16 @@ public class EntityPersisterTest {
 
     @After
     public void tearDown() throws Exception {
+        
+    }
+    
+    @AfterClass
+    public static void classTearDown() throws Exception {
+        esClient.close();
+        if (esRunner.isRunningLocally()) {
+            esRunner.stopLocally();
+            esRunner.clearup();
+        }
     }
 
 }
