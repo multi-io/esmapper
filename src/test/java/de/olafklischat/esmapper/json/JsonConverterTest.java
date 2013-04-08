@@ -207,6 +207,30 @@ public class JsonConverterTest {
     }
     
     @Test
+    public void testReadNestedGenericList() {
+        JsonConverter c = new JsonConverter();
+        TestCountry fromJson = (TestCountry) c.fromJson("" +
+                "{name: \"Germany\"," +
+                "population: 82000000," +
+                "companies: [" +
+                    "{name:\"BMW\"," +
+                      "revenue:120000," +
+                      "nrOfEmployees: 35000}," +
+                    "{name:\"Mercedes\"," +
+                      "revenue:456," +
+                      "nrOfEmployees: 789} ]," +
+                "ignored:\"ignoredValue\" }");
+        TestOrg bmw = new TestOrg("BMW", 120000, 35000);
+        TestOrg merc = new TestOrg("Mercedes", 456, 789);
+        TestCountry ger = new TestCountry("Germany", 82000000, Lists.newArrayList(bmw, merc), null);
+        assertEquals(ger, fromJson);
+        assertNull(fromJson.getIgnored()); //should've been caught by the previous test, but check explicitly again
+        assertTrue(fromJson.getCompanies() instanceof LinkedList<?>);
+        assertEquals(bmw, fromJson.getCompanies().get(0));
+        assertEquals(merc, fromJson.getCompanies().get(1));
+    }
+
+    @Test
     public void testWriteAnnotatedObject() {
         JsonConverter c = new JsonConverter();
         TestOrg bmw = new TestOrg("BMW", 120000, 35000);

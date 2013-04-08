@@ -6,7 +6,9 @@ import java.beans.PropertyDescriptor;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Array;
 import java.lang.reflect.Method;
+import java.lang.reflect.ParameterizedType;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -59,6 +61,7 @@ public class PropertyPath {
         return head.getMapKey();
     }
 
+    //TODO: probably better to return j.l.reflect.Type here, to cover arrays, primitives etc.
     public Class<?> getNodeClass() {
         return head.getNodeClass();
     }
@@ -230,6 +233,7 @@ public class PropertyPath {
             return mapKey;
         }
         
+        //TODO: probably better to return j.l.reflect.Type here, to cover arrays, primitives etc.
         public Class<?> getNodeClass() {
             switch (type) {
 
@@ -240,7 +244,8 @@ public class PropertyPath {
                 if (baseObject.getClass().isArray()) {
                     return baseObject.getClass().getComponentType();
                 } else {
-                    return Object.class;  //TODO: return the collection's generics component type, if defined
+                    Class<?> result = getCollectionComponentClass(baseObject.getClass());
+                    return result == null ? Object.class : result;
                 }
             
             case MAP_VALUE:
@@ -252,6 +257,46 @@ public class PropertyPath {
             default:
                 throw new IllegalStateException("shouldn't happen");
             }
+        }
+        
+        protected Class<?> getCollectionComponentClass(java.lang.reflect.Type collType) {
+            if (collType.equals(Object.class)) {
+                return null; //no collection class found in this branch of the hierarchy
+            }
+            java.lang.reflect.Type collRawType = collType;
+            ParameterizedType collParamType = null;
+            if (collRawType instanceof ParameterizedType) {
+                collParamType = (ParameterizedType) collRawType;
+                collRawType = collParamType.getRawType();
+            }
+            if (collRawType.equals(Collection.class)) {
+                if (collParamType == null || collParamType.getActualTypeArguments().length != 1) {
+                    return Object.class;
+                } else {
+                    java.lang.reflect.Type t = collParamType.getActualTypeArguments()[0];
+                    if (t instanceof Class<?>) {
+                        return (Class<?>) t;
+                    } else {
+                        return Object.class;
+                    }
+                }
+            }
+            
+            if (! (collRawType instanceof Class<?>)) {
+                return null;
+            }
+            Class<?> collClass = (Class<?>) collRawType;
+            
+            Collection<java.lang.reflect.Type> supertypes = new ArrayList<java.lang.reflect.Type>();
+            supertypes.add(collClass.getGenericSuperclass());
+            supertypes.addAll(Arrays.asList(collClass.getGenericInterfaces()));
+            for (java.lang.reflect.Type supertype : supertypes) {
+                Class<?> res = getCollectionComponentClass(supertype);
+                if (res != null) {
+                    return res;
+                }
+            }
+            return null;
         }
         
         public <T extends Annotation> T getAnnotation(Class<T> annotationClass) {
