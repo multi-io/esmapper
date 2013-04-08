@@ -1,8 +1,11 @@
 package de.olafklischat.esmapper;
 
 import java.io.IOException;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 
 import org.apache.log4j.Logger;
 import org.elasticsearch.action.get.GetRequestBuilder;
@@ -118,9 +121,7 @@ public class EntityPersister {
                 log.debug("persisting: " + Joiner.on("=>").join(Lists.reverse(entitiesStack)) + " (" + entity + ")");
             }
             
-            JsonConverter jsc = new JsonConverter();
-            jsc.registerMarshaller(this);
-            String json = jsc.toJson(entity);
+            seenEntities.add(entity);
             
             IndexRequestBuilder irb = getEsClient().prepareIndex();
             if (prevId != null) {
@@ -130,10 +131,16 @@ public class EntityPersister {
                 }
                 irb.setCreate(false);
             } else {
+                String id = UUID.randomUUID().toString();
+                irb.setId(id);
+                entity.setId(id);
                 irb.setCreate(true);
             }
             irb.setIndex("esdb");
             irb.setType(entity.getClass().getSimpleName());
+            JsonConverter jsc = new JsonConverter();
+            jsc.registerMarshaller(this);
+            String json = jsc.toJson(entity);
             irb.setSource(json);
             try {
                 IndexResponse res = irb.execute().actionGet();
@@ -163,8 +170,6 @@ public class EntityPersister {
             Entity e = (Entity) source;
             
             if (! seenEntities.contains(e)) {
-                seenEntities.add(e);
-
                 //TODO: recursion may be less robust
                 entitiesStack.push(sourcePath);
                 try {
