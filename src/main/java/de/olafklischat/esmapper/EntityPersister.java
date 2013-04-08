@@ -77,6 +77,10 @@ public class EntityPersister {
     }
     
     public <T extends Entity> T findById(String id, Class<T> classOfT) {
+        return findById(id, classOfT, CascadeSpec.NO_CASCADE);
+    }
+    
+    public <T extends Entity> T findById(String id, Class<T> classOfT, CascadeSpec ccs) {
         T result;
         try {
             result = classOfT.newInstance();
@@ -85,15 +89,30 @@ public class EntityPersister {
         }
         result.setId(id);
         try {
-            load(result);
+            load(result, ccs);
         } catch (EntityNotFoundException e) {
             return null;
         }
         return result;
     }
     
-    public <T extends Entity> void load(T entity) {
+    public String findRawById(String id, Class<? extends Entity> classOfT) {
         Loader l = new Loader();
+        GetResponse res = l.readRaw(id, classOfT);
+        if (!res.exists()) {
+            return null;
+        }
+        return res.getSourceAsString();
+    }
+
+    
+    public <T extends Entity> void load(T entity) {
+        load(entity, CascadeSpec.NO_CASCADE);
+    }
+    
+    public <T extends Entity> void load(T entity, CascadeSpec ccs) {
+        Loader l = new Loader();
+        l.setCascadeSpec(ccs);
         l.load(entity);
     }
     
@@ -194,14 +213,26 @@ public class EntityPersister {
     
     
     protected class Loader implements JsonUnmarshaller {
+
+        private CascadeSpec cascadeSpec;
+        private final LinkedList<PropertyPath> entitiesStack = new LinkedList<PropertyPath>();
+        //we assume the IDs are unique globally, not just per-type
+        private final Map<String, Entity> seenEntitiesById = new HashMap<String, Entity>();
+
+        public void setCascadeSpec(CascadeSpec cascadeSpec) {
+            this.cascadeSpec = cascadeSpec;
+        }
         
         public <T extends Entity> void load(T entity) {
             String id = entity.getId();
             if (id == null) {
                 throw new IllegalArgumentException("can't load entity with null ID: " + entity);
             }
-            GetRequestBuilder grb = getEsClient().prepareGet("esdb", entity.getClass().getSimpleName(), id);
-            GetResponse res = grb.execute().actionGet();
+            if (log.isDebugEnabled()) {
+                log.debug("loading: " + Joiner.on("=>").join(Lists.reverse(entitiesStack)) + " (" + entity + ", id=" + id + ")");
+            }
+            seenEntitiesById.put(id, entity);
+            GetResponse res = readRaw(id, entity.getClass());
             if (!res.exists()) {
                 throw new EntityNotFoundException("entity not found: type=" + entity.getClass() + ", id=" + id);
             }
@@ -213,15 +244,15 @@ public class EntityPersister {
             entity.setLoaded(true);
         }
         
+        public GetResponse readRaw(String id, Class<? extends Entity> classOfT) {
+            GetRequestBuilder grb = getEsClient().prepareGet("esdb", classOfT.getSimpleName(), id);
+            return grb.execute().actionGet();
+        }
+        
         @SuppressWarnings("unchecked")
         @Override
         public boolean readJson(JsonElement src, PropertyPath targetPath,
                 JsonConverter context) throws IOException {
-            Class<?> targetType = targetPath.getNodeClass();
-            if (! Entity.class.isAssignableFrom(targetType)) {
-                //we only handle entities, leave everything else to the default handling
-                return false;
-            }
             if (targetPath.getLength() == 1) {
                 //we don't handle the root object, even if it is an entity (which it probably is)
                 return false;
@@ -230,12 +261,22 @@ public class EntityPersister {
                 return false;
             }
             JsonObject jso = src.getAsJsonObject();
-            if (! jso.has("_type")) {
-                //is this an error?
-                log.warn("" + targetPath + ": JSON contains an object that's not a reference. Embedded entity?");
+            if (! (jso.has("_type") && jso.has("_id"))) {
                 return false;
             }
+            Class<?> targetType = targetPath.getNodeClass();
+            if (! Entity.class.isAssignableFrom(targetType)) {
+                //we only handle entities, leave everything else to the default handling
+                //can't do this test atm. because getNodeClass() may return Object.class for Collection gegnerics component types
+                //return false;
+            }
             String parsedType = jso.get("_type").getAsString();
+            String parsedId = jso.get("_id").getAsString();
+            Entity instance = seenEntitiesById.get(parsedId);
+            if (instance != null) {
+                targetPath.set(instance);
+                return true;
+            }
             Class<? extends Entity> parsedClass;
             try {
                 parsedClass = (Class<? extends Entity>) Class.forName(parsedType);
@@ -247,16 +288,23 @@ public class EntityPersister {
                 throw new IllegalStateException("" + targetPath + ": incompatible _type in JSON (" +
                         parsedClass + " <-> " + targetType + ")");
             }
-            Entity instance;
             try {
                 instance = parsedClass.newInstance();
             } catch (Exception e) {
                 throw new IllegalStateException("" + targetPath + ": couldn't instatiate class referenced as _type in JSON (" +
                         parsedClass + ")", e);
             }
-            String parsedId = jso.get("_id").getAsString();
             instance.setId(parsedId);
             targetPath.set(instance);
+            seenEntitiesById.put(parsedId, instance);
+            if (cascadeSpec.isCasecade()) {
+                entitiesStack.push(targetPath);
+                try {
+                    load(instance);
+                } finally {
+                    entitiesStack.pop();
+                }
+            }
             return true;
         }
     }
