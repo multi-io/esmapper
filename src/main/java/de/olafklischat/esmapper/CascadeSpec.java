@@ -5,19 +5,19 @@ public class CascadeSpec {
     public static final CascadeSpec NO_CASCADE = new CascadeSpec(false);
     public static final CascadeSpec FULL_CASCADE = new CascadeSpec(true);
     
-    private boolean casecade;
+    private boolean cascade;
     
-    public CascadeSpec(boolean casecade) {
+    public CascadeSpec(boolean cascade) {
         super();
-        this.casecade = casecade;
+        this.cascade = cascade;
     }
 
-    public boolean isCasecade() {
-        return casecade;
+    public boolean isCascade() {
+        return cascade;
     }
 
     public void setCasecade(boolean casecade) {
-        this.casecade = casecade;
+        this.cascade = casecade;
     }
 
 }

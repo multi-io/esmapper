@@ -297,7 +297,7 @@ public class EntityPersister {
             instance.setId(parsedId);
             targetPath.set(instance);
             seenEntitiesById.put(parsedId, instance);
-            if (cascadeSpec.isCasecade()) {
+            if (cascadeSpec.isCascade()) {
                 entitiesStack.push(targetPath);
                 try {
                     load(instance);
