@@ -51,16 +51,26 @@ public class EntityPersister {
         Node node = NodeBuilder.nodeBuilder().client(true).node();
         return node.client();
     }
-    
 
     /**
+     * Persist an entity, with full cascade, and updating entities even if the
+     * in-DB version was newer.
      * 
-     * @param o
+     * @param entity
      * @return
-     * @throws VersionConflictException if the object was already newer in the database
      */
-    public <T extends Entity> T persist(T o) {
-        return persist(o, false);
+    public <T extends Entity> T persist(T entity) {
+        return persist(entity, false, CascadeSpec.cascade());
+    }
+
+    public <T extends Entity> T persist(T entity, boolean ignoreVersion) {
+        return persist(entity, ignoreVersion, CascadeSpec.cascade());
+    }
+    
+    public <T extends Entity> T persist(T entity, CascadeSpec ccs) {
+        Persister p = new Persister();
+        p.setSubObjectsIgnoreVersion(true);  //TODO make configurable
+        return p.persist(entity, false, ccs);
     }
 
     /**
@@ -70,14 +80,14 @@ public class EntityPersister {
      * @throws VersionConflictException if the object was already newer in the database. Won't happen if ignoreVersion.
      * @return
      */
-    public <T extends Entity> T persist(T entity, boolean ignoreVersion) {
+    public <T extends Entity> T persist(T entity, boolean ignoreVersion, CascadeSpec ccs) {
         Persister p = new Persister();
         p.setSubObjectsIgnoreVersion(true);  //TODO make configurable
-        return p.persist(entity, ignoreVersion);
+        return p.persist(entity, ignoreVersion, ccs);
     }
     
     public <T extends Entity> T findById(String id, Class<T> classOfT) {
-        return findById(id, classOfT, CascadeSpec.NO_CASCADE);
+        return findById(id, classOfT, CascadeSpec.noCascade());
     }
     
     public <T extends Entity> T findById(String id, Class<T> classOfT, CascadeSpec ccs) {
@@ -107,13 +117,12 @@ public class EntityPersister {
 
     
     public <T extends Entity> void load(T entity) {
-        load(entity, CascadeSpec.NO_CASCADE);
+        load(entity, CascadeSpec.cascade());
     }
     
     public <T extends Entity> void load(T entity, CascadeSpec ccs) {
         Loader l = new Loader();
-        l.setCascadeSpec(ccs);
-        l.load(entity);
+        l.load(entity, ccs);
     }
     
     protected class Persister implements JsonMarshaller {
@@ -129,7 +138,7 @@ public class EntityPersister {
             this.subObjectsIgnoreVersion = subObjectsIgnoreVersion;
         }
         
-        public <T extends Entity> T persist(T entity, boolean ignoreVersion) {
+        public <T extends Entity> T persist(T entity, boolean ignoreVersion, CascadeSpec cascadeSpec) {
             String prevId = entity.getId();
             Long prevVersion = entity.getVersion();
             if ((prevId == null) != (prevVersion == null)) {
@@ -159,6 +168,7 @@ public class EntityPersister {
             irb.setType(entity.getClass().getSimpleName());
             JsonConverter jsc = new JsonConverter();
             jsc.registerMarshaller(this);
+            jsc.setAttribute("cascadeSpec", cascadeSpec);
             String json = jsc.toJson(entity);
             irb.setSource(json);
             try {
@@ -188,25 +198,47 @@ public class EntityPersister {
             }
             Entity e = (Entity) source;
             
-            if (! seenEntities.contains(e)) {
+            if (seenEntities.contains(e)) {
+                out.beginObject();
+                out.name("_ref_id");
+                out.value(e.getId());
+                out.name("_ref_class");
+                out.value(e.getClass().getCanonicalName());
+                out.endObject();
+                return true;
+            }
+            
+            boolean ePersisted = false;
+            CascadeSpec currSpec = (CascadeSpec) context.getAttribute("cascadeSpec");
+            CascadeSpec subSpec = currSpec.getEffectiveSubSpecFor(sourcePath.getPathNotation());
+            if (subSpec.isDefaultCascade()) {
                 //TODO: recursion may be less robust
                 entitiesStack.push(sourcePath);
                 try {
                     //TODO: configurability:
                     // - option to only persist non-loaded (new) entities (i.e. no updates)
                     // - ^^ but beware: even non-new entities may reference new ones
-                    persist(e, subObjectsIgnoreVersion);
+                    persist(e, subObjectsIgnoreVersion, subSpec);
+                    out.beginObject();
+                    out.name("_ref_id");
+                    out.value(e.getId());
+                    out.name("_ref_class");
+                    out.value(e.getClass().getCanonicalName());
+                    out.endObject();
+                    ePersisted = true;
                 } finally {
                     entitiesStack.pop();
+                    if (!ePersisted) {
+                        //exception was thrown
+                        out.nullValue();
+                    }
                 }
             }
 
-            out.beginObject();
-            out.name("_id");
-            out.value(e.getId());
-            out.name("_type");
-            out.value(e.getClass().getCanonicalName());
-            out.endObject();
+            if (!ePersisted) {
+                out.nullValue();
+            }
+
             return true;
         }
     }
@@ -214,16 +246,11 @@ public class EntityPersister {
     
     protected class Loader implements JsonUnmarshaller {
 
-        private CascadeSpec cascadeSpec;
         private final LinkedList<PropertyPath> entitiesStack = new LinkedList<PropertyPath>();
         //we assume the IDs are unique globally, not just per-type
         private final Map<String, Entity> seenEntitiesById = new HashMap<String, Entity>();
 
-        public void setCascadeSpec(CascadeSpec cascadeSpec) {
-            this.cascadeSpec = cascadeSpec;
-        }
-        
-        public <T extends Entity> void load(T entity) {
+        public <T extends Entity> void load(T entity, CascadeSpec cascadeSpec) {
             String id = entity.getId();
             if (id == null) {
                 throw new IllegalArgumentException("can't load entity with null ID: " + entity);
@@ -238,6 +265,7 @@ public class EntityPersister {
             }
             JsonConverter jsc = new JsonConverter();
             jsc.registerUnmarshaller(this);
+            jsc.setAttribute("cascadeSpec", cascadeSpec);
             jsc.readJson(res.getSourceAsString(), entity);
             //entity.setId(res.getId());
             entity.setVersion(res.getVersion());
@@ -261,17 +289,17 @@ public class EntityPersister {
                 return false;
             }
             JsonObject jso = src.getAsJsonObject();
-            if (! (jso.has("_type") && jso.has("_id"))) {
+            if (! (jso.has("_ref_class") && jso.has("_ref_id"))) {
                 return false;
             }
             Class<?> targetType = targetPath.getNodeClass();
             if (! Entity.class.isAssignableFrom(targetType)) {
                 //we only handle entities, leave everything else to the default handling
-                //can't do this test atm. because getNodeClass() may return Object.class for Collection gegnerics component types
+                //can't do this test atm. because getNodeClass() may return Object.class for Collection generics component types
                 //return false;
             }
-            String parsedType = jso.get("_type").getAsString();
-            String parsedId = jso.get("_id").getAsString();
+            String parsedType = jso.get("_ref_class").getAsString();
+            String parsedId = jso.get("_ref_id").getAsString();
             Entity instance = seenEntitiesById.get(parsedId);
             if (instance != null) {
                 targetPath.set(instance);
@@ -297,10 +325,12 @@ public class EntityPersister {
             instance.setId(parsedId);
             targetPath.set(instance);
             seenEntitiesById.put(parsedId, instance);
-            if (cascadeSpec.isCascade()) {
+            CascadeSpec currSpec = (CascadeSpec) context.getAttribute("cascadeSpec");
+            CascadeSpec subSpec = currSpec.getEffectiveSubSpecFor(targetPath.getPathNotation());
+            if (subSpec.isDefaultCascade()) {
                 entitiesStack.push(targetPath);
                 try {
-                    load(instance);
+                    load(instance, subSpec);
                 } finally {
                     entitiesStack.pop();
                 }

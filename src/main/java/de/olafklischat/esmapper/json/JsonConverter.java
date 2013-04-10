@@ -6,7 +6,9 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.LinkedList;
+import java.util.Map;
 
 import com.google.gson.JsonElement;
 import com.google.gson.internal.Streams;
@@ -37,6 +39,8 @@ public class JsonConverter {
     private final Deque<JsonMarshaller> marshallers = new LinkedList<JsonMarshaller>();
     private final Deque<JsonUnmarshaller> unmarshallers = new LinkedList<JsonUnmarshaller>();
     
+    private final Map<String, Object> attributes = new HashMap<String, Object>();
+    
     public JsonConverter() {
         registerMarshaller(new DefaultBeanMarshaller());
         registerMarshaller(new DefaultMapMarshaller());
@@ -61,6 +65,23 @@ public class JsonConverter {
     
     public void registerUnmarshaller(JsonUnmarshaller um) {
         unmarshallers.addFirst(um);
+    }
+
+    /**
+     * Put arbitrary attributes into this JsonConverter. Not used by
+     * JsonConverter itself or any of the standard marshallers/unmarshallers.
+     * But may be used by user code to pass information to custom
+     * marshallers/unmarshallers.
+     * 
+     * @param name
+     * @param value
+     */
+    public void setAttribute(String name, Object value) {
+        attributes.put(name, value);
+    }
+    
+    public Object getAttribute(String name) {
+        return attributes.get(name);
     }
 
     //// Serialization (Object->JSON)

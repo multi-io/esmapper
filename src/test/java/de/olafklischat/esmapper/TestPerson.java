@@ -7,6 +7,62 @@ public class TestPerson extends Entity {
     private int age;
     private String comment;
     private TestCity homeTown;
+    private TestCity nativeTown;
+    
+    public static class AssociateRecord {
+        private TestPerson associate;
+        private String kind;
+        public AssociateRecord() {
+            // TODO Auto-generated constructor stub
+        }
+        public AssociateRecord(TestPerson associate, String kind) {
+            super();
+            this.associate = associate;
+            this.kind = kind;
+        }
+        public TestPerson getAssociate() {
+            return associate;
+        }
+        public void setAssociate(TestPerson associate) {
+            this.associate = associate;
+        }
+        public String getKind() {
+            return kind;
+        }
+        public void setKind(String kind) {
+            this.kind = kind;
+        }
+        @Override
+        public int hashCode() {
+            final int prime = 31;
+            int result = 1;
+            result = prime * result
+                    + ((associate == null) ? 0 : associate.hashCode());
+            result = prime * result + ((kind == null) ? 0 : kind.hashCode());
+            return result;
+        }
+        @Override
+        public boolean equals(Object obj) {
+            if (this == obj)
+                return true;
+            if (obj == null)
+                return false;
+            if (getClass() != obj.getClass())
+                return false;
+            AssociateRecord other = (AssociateRecord) obj;
+            if (associate == null) {
+                if (other.associate != null)
+                    return false;
+            } else if (!associate.equals(other.associate))
+                return false;
+            if (kind == null) {
+                if (other.kind != null)
+                    return false;
+            } else if (!kind.equals(other.kind))
+                return false;
+            return true;
+        }
+    }
     
     public TestPerson() {
     }
@@ -41,6 +97,12 @@ public class TestPerson extends Entity {
     }
     public void setHomeTown(TestCity homeTown) {
         this.homeTown = homeTown;
+    }
+    public TestCity getNativeTown() {
+        return nativeTown;
+    }
+    public void setNativeTown(TestCity nativeTown) {
+        this.nativeTown = nativeTown;
     }
 
     @Override
