@@ -345,6 +345,69 @@ public class JsonConverterTest {
         }
     }
 
+    @Test
+    public void testPropertyPaths() {
+        String json = "" +
+                "{name:\"A-Class\"," +
+                 "price:123," +
+                 "ingredients:[\"engine\",\"wheels\"]," +
+                 "producer:{" +
+                     "name:\"Mercedes\"," +
+                     "revenue:456," +
+                     "nrOfEmployees:789" +
+                 "}" +
+                "}";
+        JsonConverter c = new JsonConverter();
+
+        PathTrackingMarshallerUnmarshaller um = new PathTrackingMarshallerUnmarshaller();
+        c.registerUnmarshaller(um);
+        TestProduct p = c.fromJson(json, TestProduct.class);
+        assertEquals("A-Class", p.getName());
+        assertEquals(123, p.getPrice());
+        assertEquals(Lists.newArrayList("engine", "wheels"), p.getIngredients());
+        assertEquals(new TestOrg("Mercedes", 456, 789), p.getProducer());
+        assertTrue(um.seenPathNames.contains("name"));
+        assertTrue(um.seenPathNames.contains("price"));
+        assertTrue(um.seenPathNames.contains("ingredients"));
+        assertTrue(um.seenPathNames.contains("ingredients[0]"));
+        assertTrue(um.seenPathNames.contains("ingredients[1]"));
+        assertTrue(um.seenPathNames.contains("producer"));
+        assertTrue(um.seenPathNames.contains("producer.name"));
+        assertTrue(um.seenPathNames.contains("producer.nrOfEmployees"));
+        assertTrue(um.seenPathNames.contains("producer.revenue"));
+        
+        PathTrackingMarshallerUnmarshaller m = new PathTrackingMarshallerUnmarshaller();
+        c.registerMarshaller(m);
+        JsonObject pJso2 = c.toJsonElement(p).getAsJsonObject();
+        assertEquals("A-Class", pJso2.get("name").getAsString());
+        assertTrue(m.seenPathNames.contains("name"));
+        assertTrue(m.seenPathNames.contains("price"));
+        assertTrue(m.seenPathNames.contains("ingredients"));
+        assertTrue(m.seenPathNames.contains("ingredients[0]"));
+        assertTrue(m.seenPathNames.contains("ingredients[1]"));
+        assertTrue(m.seenPathNames.contains("producer"));
+        assertTrue(m.seenPathNames.contains("producer.name"));
+        assertTrue(m.seenPathNames.contains("producer.nrOfEmployees"));
+        assertTrue(m.seenPathNames.contains("producer.revenue"));
+    }
+
+    private static class PathTrackingMarshallerUnmarshaller implements JsonMarshaller, JsonUnmarshaller {
+        private final List<String> seenPathNames = new ArrayList<String>();
+        @Override
+        public boolean writeJson(PropertyPath sourcePath, JsonWriter out,
+                JsonConverter context) throws IOException {
+            seenPathNames.add(sourcePath.getPathNotation());
+            return false;
+        }
+        @Override
+        public boolean readJson(JsonElement r, PropertyPath targetPath,
+                JsonConverter context) throws IOException {
+            seenPathNames.add(targetPath.getPathNotation());
+            return false;
+        }
+    }
+
+    
     private static Map<?, ?> newMap(Object... keysAndValues) {
         Map<Object,Object> result = new HashMap<Object, Object>();
         boolean onKey = true;

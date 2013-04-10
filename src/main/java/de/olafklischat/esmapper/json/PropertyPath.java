@@ -87,6 +87,30 @@ public class PropertyPath {
         }
     }
     
+    public String getPathNotation() {
+        StringBuffer result = new StringBuffer();
+        if (tail != null) {
+            result.append(tail.getPathNotation());
+        }
+        switch (head.getType()) {
+        case PROPERTY:
+            result.append(result.toString().isEmpty()? "" : ".").append(getPropDescriptor().getName());
+            break;
+        case ARRAY_ELEMENT:
+            result.append("[" + getArrayIndex() + "]");
+            break;
+        case MAP_VALUE:
+            result.append("[" + getMapKey() + "]");
+            break;
+        case ROOT:
+            result.append("");
+            break;
+        default:
+            throw new IllegalStateException("shouldn't happen");
+        }
+        return result.toString();
+    }
+    
     @Override
     public String toString() {
         StringBuffer result = new StringBuffer();
