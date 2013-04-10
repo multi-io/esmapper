@@ -24,6 +24,8 @@ public class ESRunner {
     private NodeBuilder localNodeBuilder;
     private Node localNode;
     
+    private String workPathOfLatestLocalRun;
+    private String logsPathOfLatestLocalRun;
     private String[] dataPathsOfLatestLocalRun;
     
     public ESRunner(int httpPort) {
@@ -95,13 +97,13 @@ public class ESRunner {
         //TODO: try to shutdown ES using Java API, so it works across JVMs too
         //  http://www.elasticsearch.org/guide/reference/api/admin-cluster-nodes-shutdown/
         if (isRunningLocally()) {
+            workPathOfLatestLocalRun = getWorkPath();
+            logsPathOfLatestLocalRun = getLogsPath();
             dataPathsOfLatestLocalRun = getDataPaths();
             localNode.stop();
             localNode = null;
         }
     }
-    
-    //TODO: deleting the database in the filesystem
     
     public void join() {
         while (isRunning()) {
@@ -148,13 +150,13 @@ public class ESRunner {
         return clientBuilder.node();
     }
     
-    public void clearup() {
+    public void cleanup() {
         if (isRunningLocally()) {
-            throw new IllegalStateException("can't clearup() a running node.");
+            throw new IllegalStateException("can't cleanup() a running node.");
         }
         List<String> paths = new LinkedList<String>();
-        paths.add(getWorkPath());
-        paths.add(getLogsPath());
+        paths.add(Objects.firstNonNull(workPathOfLatestLocalRun, getWorkPath()));
+        paths.add(Objects.firstNonNull(logsPathOfLatestLocalRun, getLogsPath()));
         paths.addAll(Arrays.asList(Objects.firstNonNull(dataPathsOfLatestLocalRun, getDataPaths())));
         for (String dp : paths) {
             File dir = new File(dp);

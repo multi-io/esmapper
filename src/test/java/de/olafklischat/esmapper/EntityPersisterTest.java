@@ -243,7 +243,7 @@ public class EntityPersisterTest {
         esClient.close();
         if (esRunner.isRunningLocally()) {
             esRunner.stopLocally();
-            esRunner.clearup();
+            esRunner.cleanup();
         }
     }
 
