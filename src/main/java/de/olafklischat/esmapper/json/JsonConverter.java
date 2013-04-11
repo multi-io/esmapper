@@ -77,12 +77,12 @@ public class JsonConverter {
     
     public void writeJson(Object src, Writer out) throws IOException {
         JsonWriter jsw = new JsonWriter(out);
-        try {
-            jsw.setLenient(true);
-            writeJson(src, jsw);
-        } finally {
-            jsw.close();
-        }
+        jsw.setLenient(true);
+        writeJson(src, jsw);
+        jsw.close(); //not doing this in a finally because the writer may not be and end-of-document after
+                     // an exception in a custom marshaller, in which case close() in a finally would
+                     // throw another exception, which would shadow the original exception
+                     // TODO: used a combined/grouped exception as in Java7?
     }
     
     public JsonElement toJsonElement(Object src) {
