@@ -10,7 +10,6 @@ import java.util.List;
 import java.util.Random;
 
 import org.apache.commons.io.FileUtils;
-import org.apache.log4j.Logger;
 import org.elasticsearch.node.Node;
 import org.elasticsearch.node.NodeBuilder;
 
@@ -19,7 +18,9 @@ import com.google.common.base.Objects;
 public class ESRunner {
     //class is NOT safe to be used from multiple threads
 
-    private static final Logger log = Logger.getLogger(ESRunner.class);
+    //not using log4j here because doing so would prevent us from using this class in
+    //  build.gradle, because gradle uses log4j-over-slf4j.jar internally and we
+    //  use slf4j-log4j12, which don't go together at runtime in the same classpath.
 
     private NodeBuilder localNodeBuilder;
     private Node localNode;
@@ -164,7 +165,8 @@ public class ESRunner {
                 try {
                     FileUtils.deleteDirectory(dir);
                 } catch (IOException e) {
-                    log.error("couldn't delete directory: " + dir + ": " + e.getLocalizedMessage(), e);
+                    //log.error("couldn't delete directory: " + dir + ": " + e.getLocalizedMessage(), e);
+                    System.err.println("couldn't delete directory: " + dir + ": " + e.getLocalizedMessage());
                 }
             }
         }
