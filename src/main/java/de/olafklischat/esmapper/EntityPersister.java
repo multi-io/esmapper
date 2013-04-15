@@ -329,13 +329,13 @@ public class EntityPersister {
             if (! (jso.has("_ref_class") && jso.has("_ref_id"))) {
                 return false;
             }
-            Class<?> targetType = targetPath.getNodeClass();
-            if (! Entity.class.isAssignableFrom(targetType)) {
+            Class<?> targetClass = targetPath.getNodeClass();
+            if (! Entity.class.isAssignableFrom(targetClass)) {
                 //we only handle entities, leave everything else to the default handling
                 //can't do this test atm. because getNodeClass() may return Object.class for Collection generics component types
                 //return false;
             }
-            String parsedType = jso.get("_ref_class").getAsString();
+            String parsedClassName = jso.get("_ref_class").getAsString();
             String parsedId = jso.get("_ref_id").getAsString();
             Entity instance = seenEntitiesById.get(parsedId);
             if (instance != null) {
@@ -344,24 +344,23 @@ public class EntityPersister {
             }
             Class<? extends Entity> parsedClass;
             try {
-                parsedClass = (Class<? extends Entity>) Class.forName(parsedType);
+                parsedClass = (Class<? extends Entity>) Class.forName(parsedClassName);
             } catch (Exception e) {
-                throw new IllegalStateException("" + targetPath + ": couldn't identify class referenced as _type in JSON (" +
-                        parsedType + ")", e);
+                throw new IllegalStateException("" + targetPath + ": couldn't identify class referenced as _ref_class in JSON (" +
+                        parsedClassName + ")", e);
             }
-            if (! targetType.isAssignableFrom(parsedClass)) {
-                throw new IllegalStateException("" + targetPath + ": incompatible _type in JSON (" +
-                        parsedClass + " <-> " + targetType + ")");
+            if (! targetClass.isAssignableFrom(parsedClass)) {
+                throw new IllegalStateException("" + targetPath + ": incompatible _ref_class in JSON (" +
+                        parsedClass + " <-> " + targetClass + ")");
             }
             try {
                 instance = parsedClass.newInstance();
             } catch (Exception e) {
-                throw new IllegalStateException("" + targetPath + ": couldn't instatiate class referenced as _type in JSON (" +
+                throw new IllegalStateException("" + targetPath + ": couldn't instantiate class referenced as _ref_class in JSON (" +
                         parsedClass + ")", e);
             }
             instance.setId(parsedId);
             targetPath.set(instance);
-            seenEntitiesById.put(parsedId, instance);
             CascadeSpec currSpec = (CascadeSpec) context.getAttribute("cascadeSpec");
             CascadeSpec subSpec = currSpec.getEffectiveSubSpecFor(targetPath.getPathNotation());
             if (subSpec.isDefaultCascade()) {
