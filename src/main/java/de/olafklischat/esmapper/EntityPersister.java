@@ -2,6 +2,7 @@ package de.olafklischat.esmapper;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
 import java.util.Set;
@@ -73,6 +74,14 @@ public class EntityPersister {
         return p.persist(entity, false, ccs);
     }
 
+    public <T extends Entity> void persist(CascadeSpec ccs, T... entities) {
+        Persister p = new Persister();
+        p.setSubObjectsIgnoreVersion(true);  //TODO make configurable
+        for (T entity : entities) {
+            p.persist(entity, false, ccs);
+        }
+    }
+
     /**
      * 
      * @param entity
@@ -91,6 +100,27 @@ public class EntityPersister {
     }
     
     public <T extends Entity> T findById(String id, Class<T> classOfT, CascadeSpec ccs) {
+        return findById(id, classOfT, ccs, new Loader());
+    }
+
+    /**
+     * 
+     * @param <T>
+     * @param classOfT
+     * @param ccs
+     * @param ids
+     * @return loaded entities. The map will have a defined order -- that of the ids
+     */
+    public <T extends Entity> Map<String, T> findById(Class<T> classOfT, CascadeSpec ccs, String... ids) {
+        Loader l = new Loader();
+        Map<String, T> result = new LinkedHashMap<String, T>();
+        for (String id : ids) {
+            result.put(id, findById(id, classOfT, ccs, l));
+        }
+        return result;
+    }
+
+    protected <T extends Entity> T findById(String id, Class<T> classOfT, CascadeSpec ccs, Loader l) {
         T result;
         try {
             result = classOfT.newInstance();
@@ -99,7 +129,7 @@ public class EntityPersister {
         }
         result.setId(id);
         try {
-            load(result, ccs);
+            l.load(result, ccs);
         } catch (EntityNotFoundException e) {
             return null;
         }
@@ -125,10 +155,17 @@ public class EntityPersister {
         l.load(entity, ccs);
     }
     
+    public <T extends Entity> void load(CascadeSpec ccs, T... entities) {
+        Loader l = new Loader();
+        for (T entity : entities) {
+            l.load(entity, ccs);
+        }
+    }
+
     protected class Persister implements JsonMarshaller {
         private boolean subObjectsIgnoreVersion = false;
         private final LinkedList<PropertyPath> entitiesStack = new LinkedList<PropertyPath>();
-        private final Set<Entity> seenEntities = new IdentityHashSet<Entity>();
+        private final Set<Entity> seenEntities = new IdentityHashSet<Entity>();  //TODO: hash by ID rather than identity?
 
         public boolean isSubObjectsIgnoreVersion() {
             return subObjectsIgnoreVersion;

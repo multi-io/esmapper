@@ -8,6 +8,8 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.util.Arrays;
+import java.util.Iterator;
+import java.util.Map;
 
 import org.elasticsearch.common.collect.Lists;
 import org.elasticsearch.node.Node;
@@ -382,6 +384,43 @@ public class EntityPersisterTest {
         assertLoaded(paul2.getNativeTown());
         assertEquals(g.brm, paul2.getNativeTown());
         assertEquals(g.ldn, paul2.getNativeTown().getSisterCities().get(0));
+    }
+
+    @Test
+    public void testStoreLoadMultiple() {
+        TestCity liv = new TestCity("Liverpool", 12345);
+        TestPerson john = new TestPerson("john", 67, "foo");
+        TestPerson paul = new TestPerson("paul", 65, "bar");
+        TestPerson george = new TestPerson("george", 65, "baz");
+        john.setHomeTown(liv);
+        paul.setHomeTown(liv);
+        george.setNativeTown(liv);
+        
+        ep.persist(CascadeSpec.cascade(), john, paul, george);
+
+        assertLoaded(john);
+        assertLoaded(paul);
+        assertLoaded(george);
+        assertLoaded(liv);
+
+        Map<String, TestPerson> readback = ep.findById(TestPerson.class, CascadeSpec.cascade(), john.getId(), paul.getId(), george.getId());
+        TestPerson john2 = readback.get(john.getId());
+        TestPerson paul2 = readback.get(paul.getId());
+        TestPerson george2 = readback.get(george.getId());
+
+        assertEquals(john, john2);
+        assertEquals(paul, paul2);
+        assertEquals(george, george2);
+        assertEquals(liv, john2.getHomeTown());
+        assertTrue(john2.getHomeTown() == paul2.getHomeTown());
+        assertTrue(john2.getHomeTown() == george2.getNativeTown());
+        
+        //check that the order of elements in readback corresponds to the passed IDs
+        Iterator<TestPerson> it = readback.values().iterator();
+        assertTrue(john2 == it.next());
+        assertTrue(paul2 == it.next());
+        assertTrue(george2 == it.next());
+        assertFalse(it.hasNext());
     }
 
     @After
