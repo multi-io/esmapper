@@ -346,6 +346,19 @@ public class EntityPersisterTest {
     }
 
     @Test
+    public void testStoreLoadNestedRelationWithRootCycle() {
+        TestCity liv = new TestCity("Liverpool", 12345);
+        liv.setSisterCities(Lists.newArrayList(liv));
+
+        ep.persist(liv);
+        assertLoaded(liv);
+        
+        TestCity liv2 = ep.findById(liv.getId(), TestCity.class);
+        assertEquals(liv, liv2);
+        assertTrue(liv2.getSisterCities().get(0) == liv2);
+    }
+    
+    @Test
     public void testLoadNestedRelationWithCyclesWithCascadeSpec() {
         TestObjectGraph g = new TestObjectGraph();
         
