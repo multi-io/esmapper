@@ -23,6 +23,7 @@ import org.elasticsearch.node.NodeBuilder;
 import com.google.common.base.Joiner;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.stream.JsonWriter;
 
 import de.olafklischat.esmapper.Entity;
@@ -120,12 +121,21 @@ public class EntityPersister {
         return result;
     }
 
+    public Map<String, Entity> findById(CascadeSpec ccs, String... ids) {
+        Loader l = new Loader();
+        Map<String, Entity> result = new LinkedHashMap<String, Entity>();
+        for (String id : ids) {
+            result.put(id, findById(id, ccs, l));
+        }
+        return result;
+    }
+
     protected <T extends Entity> T findById(String id, Class<T> classOfT, CascadeSpec ccs, Loader l) {
         T result;
         try {
             result = classOfT.newInstance();
         } catch (Exception e) {
-            throw new IllegalStateException("unable to instantiate entity class" + classOfT.getName(), e);
+            throw new IllegalStateException("unable to instantiate entity class " + classOfT.getName(), e);
         }
         result.setId(id);
         try {
@@ -136,6 +146,35 @@ public class EntityPersister {
         return result;
     }
     
+    protected Entity findById(String id, CascadeSpec ccs, Loader l) {
+        Entity result;
+        GetResponse res = l.readRaw(id, null);
+        if (! res.exists()) {
+            return null;
+        }
+        try {
+            // determine class from _class property. disadvantage: requires additional JSON->JsonObject parse step
+            // We could determine it from res.getType(), but that would prevent users from storing entities in
+            // arbitrary types. We could also use JconConverter's own polymorphic Object fromJson(String json),
+            // which reads the _class internally, but in that case, the root entity would be created by JsonConverter,
+            // relatively late in the Json->Object conversion, which would make it a bit awkward to capture the
+            // root object and put it into the Loader's seenEntitiesById early enough (it is possible, but the code
+            // would be ugly)
+            JsonParser p = new JsonParser();
+            JsonObject json = p.parse(res.getSourceAsString()).getAsJsonObject();
+            result = (Entity) Class.forName(json.get("_class").getAsString()).newInstance();
+        } catch (Exception e) {
+            throw new IllegalStateException("unable to instantiate entity class " + res.getType(), e);
+        }
+        result.setId(id);
+        try {
+            l.load(result, ccs);
+        } catch (EntityNotFoundException e) {
+            return null;
+        }
+        return result;
+    }
+
     public String findRawById(String id, Class<? extends Entity> classOfT) {
         Loader l = new Loader();
         GetResponse res = l.readRaw(id, classOfT);
@@ -292,11 +331,22 @@ public class EntityPersister {
             if (id == null) {
                 throw new IllegalArgumentException("can't load entity with null ID: " + entity);
             }
+            GetResponse res = readRaw(id, entity.getClass());
+            load(res, entity, cascadeSpec);
+        }
+
+        public <T extends Entity> void load(GetResponse res, T entity, CascadeSpec cascadeSpec) {
+            String id = entity.getId();
+            if (id == null) {
+                throw new IllegalArgumentException("can't load entity with null ID: " + entity);
+            }
             if (log.isDebugEnabled()) {
                 log.debug("loading: " + Joiner.on("=>").join(Lists.reverse(entitiesStack)) + " (" + entity + ", id=" + id + ")");
             }
+            if (seenEntitiesById.containsKey(id)) {
+                return;
+            }
             seenEntitiesById.put(id, entity);
-            GetResponse res = readRaw(id, entity.getClass());
             if (!res.exists()) {
                 throw new EntityNotFoundException("entity not found: type=" + entity.getClass() + ", id=" + id);
             }
@@ -310,7 +360,7 @@ public class EntityPersister {
         }
         
         public GetResponse readRaw(String id, Class<? extends Entity> classOfT) {
-            GetRequestBuilder grb = getEsClient().prepareGet("esdb", classOfT.getSimpleName(), id);
+            GetRequestBuilder grb = getEsClient().prepareGet("esdb", classOfT == null ? null : classOfT.getSimpleName(), id);
             return grb.execute().actionGet();
         }
         

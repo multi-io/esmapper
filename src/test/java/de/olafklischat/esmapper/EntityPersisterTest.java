@@ -412,6 +412,7 @@ public class EntityPersisterTest {
         assertEquals(paul, paul2);
         assertEquals(george, george2);
         assertEquals(liv, john2.getHomeTown());
+        assertTrue(paul2.getHomeTown() == paul2.getHomeTown());
         assertTrue(john2.getHomeTown() == paul2.getHomeTown());
         assertTrue(john2.getHomeTown() == george2.getNativeTown());
         
@@ -421,6 +422,28 @@ public class EntityPersisterTest {
         assertTrue(paul2 == it.next());
         assertTrue(george2 == it.next());
         assertFalse(it.hasNext());
+
+        //read cities and persons using untyped (polymorphic) find
+        Map<String, Entity> readbackAll = ep.findById(CascadeSpec.cascade(), liv.getId(), john.getId(), paul.getId(), george.getId());
+        TestCity liv3 = (TestCity) readbackAll.get(liv.getId());
+        TestPerson john3 = (TestPerson) readbackAll.get(john.getId());
+        TestPerson paul3 = (TestPerson) readbackAll.get(paul.getId());
+        TestPerson george3 = (TestPerson) readbackAll.get(george.getId());
+        
+        assertEquals(john, john3);
+        assertEquals(paul, paul3);
+        assertEquals(george, george3);
+        assertEquals(liv, liv3);
+        assertTrue(paul3.getHomeTown() == liv3);
+        assertTrue(john3.getHomeTown() == liv3);
+        assertTrue(george3.getNativeTown() == liv3);
+
+        Iterator<Entity> itAll = readbackAll.values().iterator();
+        assertTrue(liv3 == itAll.next());
+        assertTrue(john3 == itAll.next());
+        assertTrue(paul3 == itAll.next());
+        assertTrue(george3 == itAll.next());
+        assertFalse(itAll.hasNext());
     }
 
     @After
