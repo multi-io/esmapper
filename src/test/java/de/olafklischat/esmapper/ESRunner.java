@@ -32,10 +32,10 @@ public class ESRunner {
     public ESRunner(int httpPort) {
         localNodeBuilder = NodeBuilder.nodeBuilder().local(false).client(false).data(true);
         Random r = new Random();
-        config("node.name", "esrunner_node_" + r.nextInt());
+        config("node.name", "esrunner_node_" + r.nextInt(2000000000));
         config("http.port", httpPort);
         config("transport.tcp.port", httpPort + 100);
-        setClusterName("esrunner_cluster_" + r.nextInt());
+        setClusterName("esrunner_cluster_" + r.nextInt(2000000000));
     }
     
     public ESRunner config(String key, Object value) {
@@ -145,9 +145,9 @@ public class ESRunner {
     
     public Node createClient() {
         NodeBuilder clientBuilder = NodeBuilder.nodeBuilder().local(false).client(true).data(false);
-        clientBuilder.settings().put("es.path.conf", getConfigPath());
+        clientBuilder.settings().put("path.conf", getConfigPath());
         clientBuilder.settings().put("cluster.name", getClusterName());
-        clientBuilder.settings().put("es.node.name", "clientnode");
+        clientBuilder.settings().put("node.name", "clientnode");
         return clientBuilder.node();
     }
     

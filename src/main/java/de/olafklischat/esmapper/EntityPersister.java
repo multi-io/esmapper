@@ -417,6 +417,10 @@ public class EntityPersister {
                 entitiesStack.push(targetPath);
                 try {
                     load(instance, subSpec);
+                } catch (EntityNotFoundException e) {
+                    //TODO: make this configurable via the CascadeSpec
+                    //targetPath.set(null); //(alternative) set to null rather than a stub
+                    log.warn("referenced entity not found: " + targetPath + " (id=" + parsedId + "). Reference set to stub (non-loaded) entity.", e);
                 } finally {
                     entitiesStack.pop();
                 }
