@@ -7,6 +7,7 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
@@ -319,7 +320,7 @@ public class EntityPersisterTest {
 
         //load the whole graph as it was persisted, check it
         TestPerson paul2 = ep.findById(g.paul.getId(), TestPerson.class, CascadeSpec.cascade());
-        assertEquals(g.paul, paul2);
+        assertEquals(g.paul, paul2);  //(our equals doesn't descend into sub-entities, so this should be true even though we didn't cascade into everything)
         assertNull(paul2.getNativeTown());
         TestCity liv2 = paul2.getHomeTown();
         assertEquals(g.liv, liv2);
@@ -457,6 +458,86 @@ public class EntityPersisterTest {
         assertTrue(paul3 == itAll.next());
         assertTrue(george3 == itAll.next());
         assertFalse(itAll.hasNext());
+    }
+    
+    @Test
+    public void testCascadeAllListElements() {
+        TestObjectGraph g = new TestObjectGraph();
+        
+        assertNotLoaded(g.paul);
+        assertNotLoaded(g.john);
+        assertNotLoaded(g.liv);
+        assertNotLoaded(g.ldn);
+        assertNotLoaded(g.mch);
+        assertNotLoaded(g.brm);
+        
+        //persist the entire graph
+        ep.persist(g.paul, CascadeSpec.cascade());
+
+        //=> everything should've been persisted
+        assertLoaded(g.paul);
+        assertLoaded(g.john);
+        assertLoaded(g.liv);
+        assertLoaded(g.ldn);
+        assertLoaded(g.mch);
+        assertLoaded(g.brm);
+
+        //re-load liv, cascading into everything except all the sisterCities
+        TestCity liv2 = ep.findById(g.liv.getId(), TestCity.class,
+                CascadeSpec.cascade().subCascade("sisterCities\\[.*?\\]",CascadeSpec.noCascade()));
+        assertEquals(g.liv, liv2); //(our equals implementation doesn't descend into sub-entities, so this should be true even though we didn't cascade into everything)
+        //should've cascaded into mayor
+        assertEqualsIncludingId(g.john, liv2.getMayor());
+        //the sisterCities should be just unloaded references (stubs)
+        assertEquals(2, liv2.getSisterCities().size());
+        assertIsStub(liv2.getSisterCities().get(0));
+        assertIsStub(liv2.getSisterCities().get(1));
+        assertEquals(g.liv.getSisterCities().get(0).getId(), liv2.getSisterCities().get(0).getId());
+        assertEquals(g.liv.getSisterCities().get(1).getId(), liv2.getSisterCities().get(1).getId());
+    }
+
+    @Test
+    public void testCascadeAllListElementsSubEntity() {
+        TestObjectGraph g = new TestObjectGraph();
+
+        //remove the brm.sisterCities->ldn link, so we don't load ldn that way
+        g.brm.setSisterCities(new ArrayList<TestCity>());
+        
+        assertNotLoaded(g.paul);
+        assertNotLoaded(g.john);
+        assertNotLoaded(g.liv);
+        assertNotLoaded(g.ldn);
+        assertNotLoaded(g.mch);
+        assertNotLoaded(g.brm);
+        
+        //persist the graph
+        ep.persist(g.paul, CascadeSpec.cascade());
+
+        //=> everything should've been persisted
+        assertLoaded(g.paul);
+        assertLoaded(g.john);
+        assertLoaded(g.liv);
+        assertLoaded(g.ldn);
+        assertLoaded(g.mch);
+        assertLoaded(g.brm);
+        
+        //re-load paul, cascading into everything except paul.homeTown.sisterCities
+        //paul.homeTown is an also entity (TestCity), so we need nested CascadeSpecs
+        TestPerson paul2 = ep.findById(g.paul.getId(), TestPerson.class,
+                CascadeSpec.cascade().subCascade("homeTown",
+                        CascadeSpec.cascade().subCascade("sisterCities\\[.*?\\]", CascadeSpec.noCascade())));
+
+        assertEquals(g.paul, paul2);
+        //should've cascaded into nativeTown and homeTown
+        assertEqualsIncludingId(g.brm, paul2.getNativeTown());
+        TestCity liv2 = paul2.getHomeTown();
+        assertEqualsIncludingId(g.liv, liv2);
+        //the homeTown.sisterCities (i.e. liv2.sisterCities) should be just unloaded references (stubs)
+        assertEquals(2, liv2.getSisterCities().size());
+        assertIsStub(liv2.getSisterCities().get(0));
+        assertIsStub(liv2.getSisterCities().get(1));
+        assertEquals(g.liv.getSisterCities().get(0).getId(), liv2.getSisterCities().get(0).getId());
+        assertEquals(g.liv.getSisterCities().get(1).getId(), liv2.getSisterCities().get(1).getId());
     }
 
     @After

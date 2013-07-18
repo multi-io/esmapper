@@ -1,2 +1,4 @@
+# Use nodeClient.properties / test-nodeClient.properties for production!
+# Default/Fallback for tests:
 node.data: false
-cluster.name: opdis
+cluster.name: esmapper_testcluster
