@@ -540,6 +540,54 @@ public class EntityPersisterTest {
         assertEquals(g.liv.getSisterCities().get(1).getId(), liv2.getSisterCities().get(1).getId());
     }
 
+    @Test
+    public void testStoreNoCascadeRetainsRefIds() {
+        TestObjectGraph g = new TestObjectGraph();
+
+        assertNotLoaded(g.paul);
+        assertNotLoaded(g.john);
+        assertNotLoaded(g.liv);
+        assertNotLoaded(g.ldn);
+        assertNotLoaded(g.mch);
+        assertNotLoaded(g.brm);
+        
+        //persist the graph
+        ep.persist(g.paul, CascadeSpec.cascade());
+
+        //=> everything should've been persisted
+        assertLoaded(g.paul);
+        assertLoaded(g.john);
+        assertLoaded(g.liv);
+        assertLoaded(g.ldn);
+        assertLoaded(g.mch);
+        assertLoaded(g.brm);
+        
+        g.liv.setName("ModifiedLiv");
+        g.ldn.setName("ModifiedLdn");
+        g.john.setName("ModifiedJohn");
+        TestCity bri = new TestCity("Brighton", 9999);
+        g.liv.getSisterCities().add(bri);
+        
+        ep.persist(g.liv, CascadeSpec.noCascade());
+
+        //check that the noCascade persist persisted liv, retained the reference IDs
+        // in liv.sisterCities, but did not persist the liv.sisterCities themselves
+        TestCity liv2 = ep.findById(g.liv.getId(), TestCity.class, CascadeSpec.cascade());
+
+        TestCity ldn2 = liv2.getSisterCities().get(0);
+        TestCity mch2 = liv2.getSisterCities().get(1);
+        TestCity bri2 = liv2.getSisterCities().get(2);
+        TestPerson john2 = liv2.getMayor();
+        assertEqualsIncludingId(g.liv, liv2);
+        assertEquals("ModifiedLiv", liv2.getName()); //should've been covered by previous test
+        assertEquals(g.ldn.getId(), ldn2.getId());
+        assertEquals("London", ldn2.getName()); //persist mustn't have cascaded into ldn
+        assertEquals(g.mch.getId(), mch2.getId());
+        assertEquals(g.john.getId(), john2.getId());
+        assertEquals("john", john2.getName()); //persist mustn't have cascaded into john
+        assertNull(bri2);
+    }
+
     @After
     public void tearDown() throws Exception {
         

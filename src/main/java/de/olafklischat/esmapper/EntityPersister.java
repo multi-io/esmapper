@@ -275,12 +275,7 @@ public class EntityPersister {
             Entity e = (Entity) source;
             
             if (seenEntities.contains(e)) {
-                out.beginObject();
-                out.name("_ref_id");
-                out.value(e.getId());
-                out.name("_ref_class");
-                out.value(e.getClass().getCanonicalName());
-                out.endObject();
+                writeReference(out, e);
                 return true;
             }
             
@@ -295,27 +290,39 @@ public class EntityPersister {
                     // - option to only persist non-loaded (new) entities (i.e. no updates)
                     // - ^^ but beware: even non-new entities may reference new ones
                     persist(e, subObjectsIgnoreVersion, subSpec);
-                    out.beginObject();
-                    out.name("_ref_id");
-                    out.value(e.getId());
-                    out.name("_ref_class");
-                    out.value(e.getClass().getCanonicalName());
-                    out.endObject();
+                    writeReference(out, e);
                     ePersisted = true;
                 } finally {
                     entitiesStack.pop();
+                    //exception was thrown
                     if (!ePersisted) {
-                        //exception was thrown
-                        out.nullValue();
+                        if (e.getId() != null) {
+                            writeReference(out, e);
+                        } else {
+                            out.nullValue();
+                        }
                     }
                 }
             }
 
             if (!ePersisted) {
-                out.nullValue();
+                if (e.getId() != null) {
+                    writeReference(out, e);
+                } else {
+                    out.nullValue();
+                }
             }
 
             return true;
+        }
+        
+        private void writeReference(JsonWriter out, Entity e) throws IOException {
+            out.beginObject();
+            out.name("_ref_id");
+            out.value(e.getId());
+            out.name("_ref_class");
+            out.value(e.getClass().getCanonicalName());
+            out.endObject();
         }
     }
     
