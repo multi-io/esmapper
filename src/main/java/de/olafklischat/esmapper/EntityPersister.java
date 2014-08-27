@@ -37,7 +37,16 @@ public class EntityPersister {
     private static final Logger log = Logger.getLogger(EntityPersister.class);
 
     private Client esClient;
-    
+    private String indexName;
+
+    public EntityPersister() {
+    }
+
+    public EntityPersister(Client esClient, String indexName) {
+        this.esClient = esClient;
+        this.indexName = indexName;
+    }
+
     public void setEsClient(Client esClient) {
         this.esClient = esClient;
     }
@@ -49,6 +58,17 @@ public class EntityPersister {
         return esClient;
     }
     
+    public void setIndexName(String indexName) {
+        this.indexName = indexName;
+    }
+
+    public String getIndexName() {
+        if (null == indexName) {
+            throw new IllegalStateException("EntityPersister: index name not set");
+        }
+        return indexName;
+    }
+
     protected Client createDefaultEsClient() {
         Node node = NodeBuilder.nodeBuilder().client(true).node();
         return node.client();
@@ -240,7 +260,7 @@ public class EntityPersister {
                 entity.setId(id);
                 irb.setCreate(true);
             }
-            irb.setIndex("esdb");
+            irb.setIndex(getIndexName());
             irb.setType(entity.getClass().getSimpleName());
             JsonConverter jsc = new JsonConverter();
             jsc.registerMarshaller(this);
@@ -367,7 +387,7 @@ public class EntityPersister {
         }
         
         public GetResponse readRaw(String id, Class<? extends Entity> classOfT) {
-            GetRequestBuilder grb = getEsClient().prepareGet("esdb", classOfT == null ? null : classOfT.getSimpleName(), id);
+            GetRequestBuilder grb = getEsClient().prepareGet(getIndexName(), classOfT == null ? null : classOfT.getSimpleName(), id);
             return grb.execute().actionGet();
         }
         

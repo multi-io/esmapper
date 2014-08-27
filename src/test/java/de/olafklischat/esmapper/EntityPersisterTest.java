@@ -44,8 +44,7 @@ public class EntityPersisterTest {
     
     @Before
     public void setUp() throws Exception {
-        ep = new EntityPersister();
-        ep.setEsClient(esClient.client());
+        ep = new EntityPersister(esClient.client(), "testindex");
     }
     
     public static void assertLoaded(Entity e) {
