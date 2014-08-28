@@ -2,9 +2,9 @@ esmapper
 ========
 
 esmapper is a simple, bidirectional mapper for reading and writing
-Java objects from and to an Elasticsearch database. This mostly meant
-for people who use ES as a schema-less database too, rather than just
-as a search index.
+Java objects from and to an Elasticsearch database. This is mostly
+meant for people who use ES as a schema-less database too, rather than
+just as a search index.
 
 For the time being, classes to be stored must extend a common "Entity"
 base class that provides ID and version fields. This is scheduled to
@@ -86,7 +86,7 @@ Usage
 [CascadeSpec](https://github.com/multi-io/esmapper/blob/master/src/main/java/de/olafklischat/esmapper/CascadeSpec.java)
 is a recursive data structure that may be used to specify more complex
 cascade/no-cascade policies based on property names of the entity
-being loaded/stored as well entities referenced by it, directly or
+being loaded/stored as well as entities referenced by it, directly or
 indirectly. Simple collection-based (1:N) associations are supported
 as well.
 
