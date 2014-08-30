@@ -3,6 +3,7 @@ package de.olafklischat.esmapper;
 import java.util.List;
 
 import de.olafklischat.esmapper.Entity;
+import de.olafklischat.esmapper.annotations.Ignore;
 
 public class TestCity extends Entity {
     private String name;
@@ -49,6 +50,11 @@ public class TestCity extends Entity {
     
     public void setSisterCities(List<TestCity> sisterCities) {
         this.sisterCities = sisterCities;
+    }
+    
+    @Ignore
+    public int getSisterCitiesCount() {
+        return sisterCities == null ? 0 : sisterCities.size();
     }
 
     @Override

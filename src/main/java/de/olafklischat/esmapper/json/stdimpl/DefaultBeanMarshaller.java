@@ -38,6 +38,10 @@ public class DefaultBeanMarshaller implements JsonMarshaller {
         } catch (Exception e) {
             throw new IllegalStateException("error introspecting " + src + ": " + e.getLocalizedMessage(), e);
         } finally {
+            //TODO if this throws, which it may because of an I/O error or (more likely)
+            //  because writeJson above threw an exception and thus it's not legal to close the JSON object here,
+            //  then that original exception will be shadowed by the endObject() exception. We'd need something
+            //  like Java7's ARM/suppressedExceptions mechanism.
             out.endObject();
         }
     }
