@@ -218,6 +218,55 @@ public class JsonConverterTest {
         assertEquals("Germany", jso.get("name").getAsString());
         assertEquals(82000000, jso.get("population").getAsInt());
         assertNull(jso.get("ignored"));
+        assertEquals(42, jso.get("readOnly42").getAsInt());
+    }
+
+    @Test
+    public void testReadIntoIgnoredPropertyDoesntChangeItsValue() {
+        String json = "{_class:\"de.olafklischat.esmapper.json.TestCountry\"," +
+                "name: \"Germany\"," +
+                "population: 82000000," +
+                "companies: null," +
+                "ignored:\"newIgnoredValue\" }";
+        TestCountry target = new TestCountry("defaultName", 123, null, "defaultIgnoredValue");
+        JsonConverter c = new JsonConverter();
+        c.readJson(json, target);
+        TestCountry ger = new TestCountry("Germany", 82000000, null, "defaultIgnoredValue");
+        assertEquals(ger, target);
+        assertEquals("defaultIgnoredValue", target.getIgnored()); //should've been caught by the previous test, but check explicitly again
+    }
+
+    @Test
+    public void testReadIntoReadOnlyProperty() {
+        JsonConverter c = new JsonConverter();
+        String json = "{_class:\"de.olafklischat.esmapper.json.TestCountry\"," +
+                "name: \"Germany\"," +
+                "population: 82000000," +
+                "companies: null," +
+                "readOnly42: 23," +
+                "ignored:\"ignoredValue\" }";
+        try {
+            TestCountry fromJson = (TestCountry) c.fromJson(json);
+            TestCountry ger = new TestCountry("Germany", 82000000, null, null);
+            assertEquals(ger, fromJson);
+            fail("IllegalStateException (property not writable) expected");
+        } catch (IllegalStateException e) {
+            //expected exception. Trying this (having a property in the input JSON
+            //  that's only readable in Java) is an error atm. May change/be configurable in the future.
+        }
+    }
+    
+    @Test
+    public void testReadIntoIgnoredReadOnlyProperty() {
+        JsonConverter c = new JsonConverter();
+        String json = "{_class:\"de.olafklischat.esmapper.json.TestCountry\"," +
+                "name: \"Germany\"," +
+                "population: 82000000," +
+                "companies: null," +
+                "ignoredReadOnly23: 42 }";
+        TestCountry fromJson = (TestCountry) c.fromJson(json);
+        TestCountry ger = new TestCountry("Germany", 82000000, null, null);
+        assertEquals(ger, fromJson);
     }
 
     @Test

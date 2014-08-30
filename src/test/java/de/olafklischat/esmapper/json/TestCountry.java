@@ -57,6 +57,15 @@ public class TestCountry {
     public void setIgnored(String ignored) {
         this.ignored = ignored;
     }
+    
+    public int getReadOnly42() {
+        return 42;
+    }
+
+    @Ignore
+    public int getIgnoredReadOnly23() {
+        return 23;
+    }
 
     @Override
     public int hashCode() {
