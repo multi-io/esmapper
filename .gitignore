@@ -4,5 +4,6 @@ build/
 bin/
 .project
 .classpath
+.settings
 .gradle
 .metadata

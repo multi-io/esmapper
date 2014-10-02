@@ -169,7 +169,7 @@ public class EntityPersister {
     protected Entity findById(String id, CascadeSpec ccs, Loader l) {
         Entity result;
         GetResponse res = l.readRaw(id, null);
-        if (! res.exists()) {
+        if (! res.isExists()) {
             return null;
         }
         try {
@@ -198,7 +198,7 @@ public class EntityPersister {
     public String findRawById(String id, Class<? extends Entity> classOfT) {
         Loader l = new Loader();
         GetResponse res = l.readRaw(id, classOfT);
-        if (!res.exists()) {
+        if (!res.isExists()) {
             return null;
         }
         return res.getSourceAsString();
@@ -374,7 +374,7 @@ public class EntityPersister {
                 return;
             }
             seenEntitiesById.put(id, entity);
-            if (!res.exists()) {
+            if (!res.isExists()) {
                 throw new EntityNotFoundException("entity not found: type=" + entity.getClass() + ", id=" + id);
             }
             JsonConverter jsc = new JsonConverter();
