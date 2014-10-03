@@ -1,4 +1,4 @@
-package de.olafklischat.esmapper.annotations;
+package de.olafklischat.esmapper.json.annotations;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;

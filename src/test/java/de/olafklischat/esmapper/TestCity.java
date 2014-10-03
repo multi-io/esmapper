@@ -3,7 +3,7 @@ package de.olafklischat.esmapper;
 import java.util.List;
 
 import de.olafklischat.esmapper.Entity;
-import de.olafklischat.esmapper.annotations.Ignore;
+import de.olafklischat.esmapper.json.annotations.JsonIgnore;
 
 public class TestCity extends Entity {
     private String name;
@@ -52,7 +52,7 @@ public class TestCity extends Entity {
         this.sisterCities = sisterCities;
     }
     
-    @Ignore
+    @JsonIgnore
     public int getSisterCitiesCount() {
         return sisterCities == null ? 0 : sisterCities.size();
     }

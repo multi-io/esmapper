@@ -3,8 +3,8 @@ package de.olafklischat.esmapper.json;
 import java.util.LinkedList;
 import java.util.List;
 
-import de.olafklischat.esmapper.annotations.Ignore;
-import de.olafklischat.esmapper.annotations.ImplClass;
+import de.olafklischat.esmapper.json.annotations.JsonIgnore;
+import de.olafklischat.esmapper.json.annotations.ImplClass;
 
 public class TestCountry {
 
@@ -49,7 +49,7 @@ public class TestCountry {
         this.companies = companies;
     }
 
-    @Ignore
+    @JsonIgnore
     public String getIgnored() {
         return ignored;
     }
@@ -62,7 +62,7 @@ public class TestCountry {
         return 42;
     }
 
-    @Ignore
+    @JsonIgnore
     public int getIgnoredReadOnly23() {
         return 23;
     }

@@ -11,11 +11,11 @@ import com.google.common.collect.HashBiMap;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 
-import de.olafklischat.esmapper.annotations.Ignore;
-import de.olafklischat.esmapper.annotations.ImplClass;
 import de.olafklischat.esmapper.json.JsonConverter;
 import de.olafklischat.esmapper.json.JsonUnmarshaller;
 import de.olafklischat.esmapper.json.PropertyPath;
+import de.olafklischat.esmapper.json.annotations.JsonIgnore;
+import de.olafklischat.esmapper.json.annotations.ImplClass;
 
 public class DefaultObjectUnmarshaller implements JsonUnmarshaller {
 
@@ -115,7 +115,7 @@ public class DefaultObjectUnmarshaller implements JsonUnmarshaller {
             }
             JsonElement value = en.getValue();
             PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(key, targetObject), targetPath);
-            if (elementPath.getAnnotation(Ignore.class) == null) {
+            if (elementPath.getAnnotation(JsonIgnore.class) == null) {
                 converter.readJson(value, elementPath);
             }
         }

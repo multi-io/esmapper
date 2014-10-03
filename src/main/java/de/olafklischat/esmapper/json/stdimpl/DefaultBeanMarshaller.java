@@ -7,10 +7,10 @@ import java.io.IOException;
 
 import com.google.gson.stream.JsonWriter;
 
-import de.olafklischat.esmapper.annotations.Ignore;
 import de.olafklischat.esmapper.json.JsonConverter;
 import de.olafklischat.esmapper.json.JsonMarshaller;
 import de.olafklischat.esmapper.json.PropertyPath;
+import de.olafklischat.esmapper.json.annotations.JsonIgnore;
 
 public class DefaultBeanMarshaller implements JsonMarshaller {
 
@@ -28,7 +28,7 @@ public class DefaultBeanMarshaller implements JsonMarshaller {
                     continue;
                 }
                 PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(pd, src), sourcePath);
-                if (null != elementPath.getAnnotation(Ignore.class)) {
+                if (null != elementPath.getAnnotation(JsonIgnore.class)) {
                     continue;
                 }
                 out.name(pd.getName());

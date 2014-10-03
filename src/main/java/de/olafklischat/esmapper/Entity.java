@@ -1,6 +1,6 @@
 package de.olafklischat.esmapper;
 
-import de.olafklischat.esmapper.annotations.Ignore;
+import de.olafklischat.esmapper.json.annotations.JsonIgnore;
 
 /**
  * Entity type. Instances have their own database identity (as opposed to
@@ -29,7 +29,7 @@ public abstract class Entity {
     
     // TODO _index, _type, _timestamp?
 
-    @Ignore
+    @JsonIgnore
     public String getId() {
         return id;
     }
@@ -43,7 +43,7 @@ public abstract class Entity {
         this.id = id;
     }
 
-    @Ignore
+    @JsonIgnore
     public Long getVersion() {
         return version;
     }
@@ -52,7 +52,7 @@ public abstract class Entity {
         this.version = version;
     }
     
-    @Ignore
+    @JsonIgnore
     public boolean isLoaded() {
         return isLoaded;
     }
