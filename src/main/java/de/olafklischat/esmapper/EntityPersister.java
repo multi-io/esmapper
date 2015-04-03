@@ -26,7 +26,6 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import com.google.gson.stream.JsonWriter;
 
-import de.olafklischat.esmapper.Entity;
 import de.olafklischat.esmapper.json.JsonConverter;
 import de.olafklischat.esmapper.json.JsonMarshaller;
 import de.olafklischat.esmapper.json.JsonUnmarshaller;
@@ -81,21 +80,22 @@ public class EntityPersister {
      * @param entity
      * @return
      */
-    public <T extends Entity> T persist(T entity) {
+    public <T> T persist(T entity) {
         return persist(entity, false, CascadeSpec.cascade());
     }
 
-    public <T extends Entity> T persist(T entity, boolean ignoreVersion) {
+    public <T> T persist(T entity, boolean ignoreVersion) {
         return persist(entity, ignoreVersion, CascadeSpec.cascade());
     }
     
-    public <T extends Entity> T persist(T entity, CascadeSpec ccs) {
+    public <T> T persist(T entity, CascadeSpec ccs) {
         Persister p = new Persister();
         p.setSubObjectsIgnoreVersion(true);  //TODO make configurable
         return p.persist(entity, false, ccs);
     }
 
-    public <T extends Entity> void persist(CascadeSpec ccs, T... entities) {
+    @SuppressWarnings("unchecked")
+    public <T> void persist(CascadeSpec ccs, T... entities) {
         Persister p = new Persister();
         p.setSubObjectsIgnoreVersion(true);  //TODO make configurable
         for (T entity : entities) {
@@ -110,17 +110,17 @@ public class EntityPersister {
      * @throws VersionConflictException if the object was already newer in the database. Won't happen if ignoreVersion.
      * @return
      */
-    public <T extends Entity> T persist(T entity, boolean ignoreVersion, CascadeSpec ccs) {
+    public <T> T persist(T entity, boolean ignoreVersion, CascadeSpec ccs) {
         Persister p = new Persister();
         p.setSubObjectsIgnoreVersion(true);  //TODO make configurable
         return p.persist(entity, ignoreVersion, ccs);
     }
     
-    public <T extends Entity> T findById(String id, Class<T> classOfT) {
+    public <T> T findById(String id, Class<T> classOfT) {
         return findById(id, classOfT, CascadeSpec.noCascade());
     }
     
-    public <T extends Entity> T findById(String id, Class<T> classOfT, CascadeSpec ccs) {
+    public <T> T findById(String id, Class<T> classOfT, CascadeSpec ccs) {
         return findById(id, classOfT, ccs, new Loader());
     }
 
@@ -132,7 +132,7 @@ public class EntityPersister {
      * @param ids
      * @return loaded entities. The map will have a defined order -- that of the ids
      */
-    public <T extends Entity> Map<String, T> findById(Class<T> classOfT, CascadeSpec ccs, String... ids) {
+    public <T> Map<String, T> findById(Class<T> classOfT, CascadeSpec ccs, String... ids) {
         Loader l = new Loader();
         Map<String, T> result = new LinkedHashMap<String, T>();
         for (String id : ids) {
@@ -141,23 +141,23 @@ public class EntityPersister {
         return result;
     }
 
-    public Map<String, Entity> findById(CascadeSpec ccs, String... ids) {
+    public Map<String, Object> findById(CascadeSpec ccs, String... ids) {
         Loader l = new Loader();
-        Map<String, Entity> result = new LinkedHashMap<String, Entity>();
+        Map<String, Object> result = new LinkedHashMap<String, Object>();
         for (String id : ids) {
             result.put(id, findById(id, ccs, l));
         }
         return result;
     }
 
-    protected <T extends Entity> T findById(String id, Class<T> classOfT, CascadeSpec ccs, Loader l) {
+    protected <T> T findById(String id, Class<T> classOfT, CascadeSpec ccs, Loader l) {
         T result;
         try {
             result = classOfT.newInstance();
         } catch (Exception e) {
             throw new IllegalStateException("unable to instantiate entity class " + classOfT.getName(), e);
         }
-        result.setId(id);
+        EntityIntrospector.setId(result, id);
         try {
             l.load(result, ccs);
         } catch (EntityNotFoundException e) {
@@ -166,8 +166,8 @@ public class EntityPersister {
         return result;
     }
     
-    protected Entity findById(String id, CascadeSpec ccs, Loader l) {
-        Entity result;
+    protected Object findById(String id, CascadeSpec ccs, Loader l) {
+        Object result;
         GetResponse res = l.readRaw(id, null);
         if (! res.isExists()) {
             return null;
@@ -175,18 +175,18 @@ public class EntityPersister {
         try {
             // determine class from _class property. disadvantage: requires additional JSON->JsonObject parse step
             // We could determine it from res.getType(), but that would prevent users from storing entities in
-            // arbitrary types. We could also use JconConverter's own polymorphic Object fromJson(String json),
+            // arbitrary types. We could also use JsonConverter's own polymorphic Object fromJson(String json),
             // which reads the _class internally, but in that case, the root entity would be created by JsonConverter,
             // relatively late in the Json->Object conversion, which would make it a bit awkward to capture the
             // root object and put it into the Loader's seenEntitiesById early enough (it is possible, but the code
             // would be ugly)
             JsonParser p = new JsonParser();
             JsonObject json = p.parse(res.getSourceAsString()).getAsJsonObject();
-            result = (Entity) Class.forName(json.get("_class").getAsString()).newInstance();
+            result = Class.forName(json.get("_class").getAsString()).newInstance();
         } catch (Exception e) {
             throw new IllegalStateException("unable to instantiate entity class " + res.getType(), e);
         }
-        result.setId(id);
+        EntityIntrospector.setId(result, id);
         try {
             l.load(result, ccs);
         } catch (EntityNotFoundException e) {
@@ -195,7 +195,7 @@ public class EntityPersister {
         return result;
     }
 
-    public String findRawById(String id, Class<? extends Entity> classOfT) {
+    public String findRawById(String id, Class<?> classOfT) {
         Loader l = new Loader();
         GetResponse res = l.readRaw(id, classOfT);
         if (!res.isExists()) {
@@ -205,18 +205,18 @@ public class EntityPersister {
     }
 
     
-    public <T extends Entity> void load(T entity) {
+    public void load(Object entity) {
         load(entity, CascadeSpec.cascade());
     }
     
-    public <T extends Entity> void load(T entity, CascadeSpec ccs) {
+    public void load(Object entity, CascadeSpec ccs) {
         Loader l = new Loader();
         l.load(entity, ccs);
     }
     
-    public <T extends Entity> void load(CascadeSpec ccs, T... entities) {
+    public void load(CascadeSpec ccs, Object... entities) {
         Loader l = new Loader();
-        for (T entity : entities) {
+        for (Object entity : entities) {
             l.load(entity, ccs);
         }
     }
@@ -224,7 +224,7 @@ public class EntityPersister {
     protected class Persister implements JsonMarshaller {
         private boolean subObjectsIgnoreVersion = false;
         private final LinkedList<PropertyPath> entitiesStack = new LinkedList<PropertyPath>();
-        private final Set<Entity> seenEntities = new IdentityHashSet<Entity>();  //TODO: hash by ID rather than identity?
+        private final Set<Object> seenEntities = new IdentityHashSet<Object>();  //TODO: hash by ID rather than identity?
 
         public boolean isSubObjectsIgnoreVersion() {
             return subObjectsIgnoreVersion;
@@ -234,10 +234,11 @@ public class EntityPersister {
             this.subObjectsIgnoreVersion = subObjectsIgnoreVersion;
         }
         
-        public <T extends Entity> T persist(T entity, boolean ignoreVersion, CascadeSpec cascadeSpec) {
-            String prevId = entity.getId();
-            Long prevVersion = entity.getVersion();
-            if ((prevId == null) != (prevVersion == null)) {
+        public <T> T persist(T entity, boolean ignoreVersion, CascadeSpec cascadeSpec) {
+            String prevId = EntityIntrospector.getId(entity);
+            boolean supportsVersion = EntityIntrospector.supportsVersion(entity);
+            Long prevVersion = supportsVersion ? EntityIntrospector.getVersion(entity) : null;
+            if (supportsVersion && ((prevId == null) != (prevVersion == null))) {
                 throw new IllegalStateException("persisting a non-new object without a version, or a new object with a version, is not supported");
             }
             
@@ -257,7 +258,7 @@ public class EntityPersister {
             } else {
                 String id = UUID.randomUUID().toString();
                 irb.setId(id);
-                entity.setId(id);
+                EntityIntrospector.setId(entity, id);
                 irb.setCreate(true);
             }
             irb.setIndex(getIndexName());
@@ -269,11 +270,15 @@ public class EntityPersister {
             irb.setSource(json);
             try {
                 IndexResponse res = irb.execute().actionGet();
-                entity.setId(res.getId());
-                entity.setVersion(res.getVersion());
-                entity.setLoaded(true);
+                EntityIntrospector.setId(entity, res.getId());
+                if (supportsVersion) {
+                    EntityIntrospector.setVersion(entity, res.getVersion());
+                }
+                if (EntityIntrospector.supportsLoadedFlag(entity)) {
+                    EntityIntrospector.setLoaded(entity, true);
+                }
             } catch (VersionConflictEngineException esVersionException) {
-                throw new VersionConflictException("Version " + entity.getVersion() +
+                throw new VersionConflictException("Version " + EntityIntrospector.getVersion(entity) +
                         " was deprecated (" + esVersionException.getLocalizedMessage() + ")",
                         esVersionException);
             }
@@ -283,8 +288,8 @@ public class EntityPersister {
         @Override
         public boolean writeJson(PropertyPath sourcePath, JsonWriter out,
                 JsonConverter context) throws IOException {
-            Object source = sourcePath.get();
-            if (!(source instanceof Entity)) {
+            Object e = sourcePath.get();
+            if (e == null || !(EntityIntrospector.isEntity(e))) {
                 //we only handle entities, leave everything else to the default handling
                 return false;
             }
@@ -292,7 +297,6 @@ public class EntityPersister {
                 //we don't handle a root object, even if it is an entity (which it probably is)
                 return false;
             }
-            Entity e = (Entity) source;
             
             if (seenEntities.contains(e)) {
                 writeReference(out, e);
@@ -314,9 +318,9 @@ public class EntityPersister {
                     ePersisted = true;
                 } finally {
                     entitiesStack.pop();
-                    //exception was thrown
                     if (!ePersisted) {
-                        if (e.getId() != null) {
+                        //exception was thrown
+                        if (EntityIntrospector.getId(e) != null) {
                             writeReference(out, e);
                         } else {
                             out.nullValue();
@@ -326,7 +330,7 @@ public class EntityPersister {
             }
 
             if (!ePersisted) {
-                if (e.getId() != null) {
+                if (EntityIntrospector.getId(e) != null) {
                     writeReference(out, e);
                 } else {
                     out.nullValue();
@@ -336,10 +340,10 @@ public class EntityPersister {
             return true;
         }
         
-        private void writeReference(JsonWriter out, Entity e) throws IOException {
+        private void writeReference(JsonWriter out, Object e) throws IOException {
             out.beginObject();
             out.name("_ref_id");
-            out.value(e.getId());
+            out.value(EntityIntrospector.getId(e));
             out.name("_ref_class");
             out.value(e.getClass().getCanonicalName());
             out.endObject();
@@ -351,10 +355,10 @@ public class EntityPersister {
 
         private final LinkedList<PropertyPath> entitiesStack = new LinkedList<PropertyPath>();
         //we assume the IDs are unique globally, not just per-type
-        private final Map<String, Entity> seenEntitiesById = new HashMap<String, Entity>();
+        private final Map<String, Object> seenEntitiesById = new HashMap<String, Object>();
 
-        public <T extends Entity> void load(T entity, CascadeSpec cascadeSpec) {
-            String id = entity.getId();
+        public void load(Object entity, CascadeSpec cascadeSpec) {
+            String id = EntityIntrospector.getId(entity);
             if (id == null) {
                 throw new IllegalArgumentException("can't load entity with null ID: " + entity);
             }
@@ -362,8 +366,8 @@ public class EntityPersister {
             load(res, entity, cascadeSpec);
         }
 
-        public <T extends Entity> void load(GetResponse res, T entity, CascadeSpec cascadeSpec) {
-            String id = entity.getId();
+        public <T> void load(GetResponse res, T entity, CascadeSpec cascadeSpec) {
+            String id = EntityIntrospector.getId(entity);
             if (id == null) {
                 throw new IllegalArgumentException("can't load entity with null ID: " + entity);
             }
@@ -381,17 +385,20 @@ public class EntityPersister {
             jsc.registerUnmarshaller(this);
             jsc.setAttribute("cascadeSpec", cascadeSpec);
             jsc.readJson(res.getSourceAsString(), entity);
-            //entity.setId(res.getId());
-            entity.setVersion(res.getVersion());
-            entity.setLoaded(true);
+            //EntityIntrospector.setId(entity, res.getId());
+            if (EntityIntrospector.supportsVersion(entity)) {
+                EntityIntrospector.setVersion(entity, res.getVersion());
+            }
+            if (EntityIntrospector.supportsLoadedFlag(entity)) {
+                EntityIntrospector.setLoaded(entity, true);
+            }
         }
         
-        public GetResponse readRaw(String id, Class<? extends Entity> classOfT) {
+        public GetResponse readRaw(String id, Class<?> classOfT) {
             GetRequestBuilder grb = getEsClient().prepareGet(getIndexName(), classOfT == null ? null : classOfT.getSimpleName(), id);
             return grb.execute().actionGet();
         }
         
-        @SuppressWarnings("unchecked")
         @Override
         public boolean readJson(JsonElement src, PropertyPath targetPath,
                 JsonConverter context) throws IOException {
@@ -407,21 +414,21 @@ public class EntityPersister {
                 return false;
             }
             Class<?> targetClass = targetPath.getNodeClass();
-            if (! Entity.class.isAssignableFrom(targetClass)) {
+            if (! EntityIntrospector.isEntity(targetClass)) {
                 //we only handle entities, leave everything else to the default handling
                 //can't do this test atm. because getNodeClass() may return Object.class for Collection generics component types
                 //return false;
             }
             String parsedClassName = jso.get("_ref_class").getAsString();
             String parsedId = jso.get("_ref_id").getAsString();
-            Entity instance = seenEntitiesById.get(parsedId);
+            Object instance = seenEntitiesById.get(parsedId);
             if (instance != null) {
                 targetPath.set(instance);
                 return true;
             }
-            Class<? extends Entity> parsedClass;
+            Class<?> parsedClass;
             try {
-                parsedClass = (Class<? extends Entity>) Class.forName(parsedClassName);
+                parsedClass = Class.forName(parsedClassName);
             } catch (Exception e) {
                 throw new IllegalStateException("" + targetPath + ": couldn't identify class referenced as _ref_class in JSON (" +
                         parsedClassName + ")", e);
@@ -436,7 +443,7 @@ public class EntityPersister {
                 throw new IllegalStateException("" + targetPath + ": couldn't instantiate class referenced as _ref_class in JSON (" +
                         parsedClass + ")", e);
             }
-            instance.setId(parsedId);
+            EntityIntrospector.setId(instance, parsedId);
             targetPath.set(instance);
             CascadeSpec currSpec = (CascadeSpec) context.getAttribute("cascadeSpec");
             CascadeSpec subSpec = currSpec.getEffectiveSubSpecFor(targetPath.getPathNotation());

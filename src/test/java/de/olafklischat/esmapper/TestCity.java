@@ -2,10 +2,15 @@ package de.olafklischat.esmapper;
 
 import java.util.List;
 
-import de.olafklischat.esmapper.Entity;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Version;
+
+import de.olafklischat.esmapper.annotations.LoadedFlag;
 import de.olafklischat.esmapper.json.annotations.JsonIgnore;
 
-public class TestCity extends Entity {
+@Entity
+public class TestCity {
     private String name;
     private int population;
     private TestPerson mayor;
@@ -19,6 +24,40 @@ public class TestCity extends Entity {
         this.name = name;
         this.population = population;
     }
+
+    private String id;
+
+    private Long version;
+    
+    private boolean isLoaded = false;
+    
+    @Id
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    @Version
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
+    }
+    
+    @LoadedFlag
+    public boolean isLoaded() {
+        return isLoaded;
+    }
+    
+    public void setLoaded(boolean isLoaded) {
+        this.isLoaded = isLoaded;
+    }
+
 
     public String getName() {
         return name;

@@ -10,12 +10,10 @@ import org.elasticsearch.common.collect.Tuple;
 
 import com.google.common.base.Objects;
 
-import de.olafklischat.esmapper.Entity;
-
 /**
  * Specifies if and how an {@link EntityPersister#load(de.olafklischat.esmapper.Entity)
  * load} or {@link EntityPersister#persist(de.olafklischat.esmapper.Entity) persist}
- * operation for an {@link Entity} should cascade into other entities referenced
+ * operation for an entity object should cascade into other entities referenced
  * by that Entity. CascadeSpec is a recursive data structure, allowing you to
  * specify cascade/no-cascade policies for the referenced entities (and their
  * referenced entities, and so on) as well.

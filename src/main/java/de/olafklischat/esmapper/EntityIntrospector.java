@@ -7,6 +7,7 @@ import java.lang.annotation.Annotation;
 import java.util.HashMap;
 import java.util.Map;
 
+import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Version;
 
@@ -106,6 +107,14 @@ public class EntityIntrospector {
             }
             return ms;
         }
+    }
+
+    public static boolean isEntity(Object obj) {
+        return null != obj.getClass().getAnnotation(Entity.class);
+    }
+    
+    public static boolean isEntity(Class<?> cls) {
+        return null != cls.getAnnotation(Entity.class);
     }
 
     /**

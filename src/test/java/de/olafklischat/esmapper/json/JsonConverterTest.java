@@ -51,7 +51,6 @@ public class JsonConverterTest {
         assertEquals("null", c.toJson(null));
     }
 
-    @SuppressWarnings("unchecked")
     @Test
     public void testWriteJsonPrimitiveArray() {
         JsonConverter c = new JsonConverter();

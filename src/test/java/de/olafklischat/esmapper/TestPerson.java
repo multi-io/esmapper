@@ -1,8 +1,14 @@
 package de.olafklischat.esmapper;
 
-import de.olafklischat.esmapper.Entity;
+import javax.persistence.Entity;
+import javax.persistence.Id;
+import javax.persistence.Version;
 
-public class TestPerson extends Entity {
+import de.olafklischat.esmapper.annotations.LoadedFlag;
+
+
+@Entity
+public class TestPerson {
     private String name;
     private int age;
     private String comment;
@@ -72,6 +78,39 @@ public class TestPerson extends Entity {
         this.name = name;
         this.age = age;
         this.comment = comment;
+    }
+
+    private String id;
+
+    private Long version;
+    
+    private boolean isLoaded = false;
+    
+    @Id
+    public String getId() {
+        return id;
+    }
+
+    public void setId(String id) {
+        this.id = id;
+    }
+
+    @Version
+    public Long getVersion() {
+        return version;
+    }
+
+    public void setVersion(Long version) {
+        this.version = version;
+    }
+    
+    @LoadedFlag
+    public boolean isLoaded() {
+        return isLoaded;
+    }
+    
+    public void setLoaded(boolean isLoaded) {
+        this.isLoaded = isLoaded;
     }
 
     public String getName() {

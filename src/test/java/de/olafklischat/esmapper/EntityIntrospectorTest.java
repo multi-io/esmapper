@@ -2,6 +2,7 @@ package de.olafklischat.esmapper;
 
 import static org.junit.Assert.*;
 
+import javax.persistence.Entity;
 import javax.persistence.Id;
 import javax.persistence.Version;
 
@@ -9,7 +10,7 @@ import org.junit.Test;
 
 import de.olafklischat.esmapper.annotations.LoadedFlag;
 
-
+@Entity
 class BeanAllPropsNoAnns {
     private String id;
     private Long version;
@@ -35,6 +36,7 @@ class BeanAllPropsNoAnns {
     }
 }
 
+@Entity
 class BeanAllPropsAnns {
     private String id;
     private Long version;
@@ -85,6 +87,7 @@ class BeanAllPropsAnns {
     }
 }
 
+@Entity
 class BeanNoIdNoAnns {
     private Long version;
     private boolean isLoaded = false;
@@ -103,6 +106,7 @@ class BeanNoIdNoAnns {
     }
 }
 
+@Entity
 class BeanOnlyId {
     private String id;
     public String getId() {
@@ -118,6 +122,7 @@ public class EntityIntrospectorTest {
     @Test
     public void testDefaultId() {
         BeanAllPropsNoAnns ent = new BeanAllPropsNoAnns();
+        assertTrue(EntityIntrospector.isEntity(ent));
         assertNull(ent.getId());
         assertNull(EntityIntrospector.getId(ent));
         ent.setId("123");
@@ -132,6 +137,7 @@ public class EntityIntrospectorTest {
     @Test
     public void testDefaultVersion() {
         BeanAllPropsNoAnns ent = new BeanAllPropsNoAnns();
+        assertTrue(EntityIntrospector.isEntity(ent));
         assertNull(ent.getVersion());
         assertNull(EntityIntrospector.getVersion(ent));
         ent.setVersion(23L);
@@ -144,6 +150,7 @@ public class EntityIntrospectorTest {
     @Test
     public void testDefaultLoaded() {
         BeanAllPropsNoAnns ent = new BeanAllPropsNoAnns();
+        assertTrue(EntityIntrospector.isEntity(ent));
         assertFalse(ent.isLoaded());
         assertFalse(EntityIntrospector.isLoaded(ent));
         ent.setLoaded(true);
@@ -156,6 +163,7 @@ public class EntityIntrospectorTest {
     @Test
     public void testAnnotatedId() {
         BeanAllPropsAnns ent = new BeanAllPropsAnns();
+        assertTrue(EntityIntrospector.isEntity(ent));
         assertNull(ent.getId());
         assertNull(ent.getRealId());
         assertNull(EntityIntrospector.getId(ent));
@@ -179,6 +187,7 @@ public class EntityIntrospectorTest {
     @Test
     public void testAnnotatedVersion() {
         BeanAllPropsAnns ent = new BeanAllPropsAnns();
+        assertTrue(EntityIntrospector.isEntity(ent));
         assertNull(ent.getVersion());
         assertNull(ent.getRealVersion());
         assertNull(EntityIntrospector.getVersion(ent));
@@ -202,6 +211,7 @@ public class EntityIntrospectorTest {
     @Test
     public void testAnnotatedLoaded() {
         BeanAllPropsAnns ent = new BeanAllPropsAnns();
+        assertTrue(EntityIntrospector.isEntity(ent));
         assertFalse(ent.isLoaded());
         assertFalse(ent.isRealLoaded());
         assertFalse(EntityIntrospector.isLoaded(ent));
@@ -219,6 +229,7 @@ public class EntityIntrospectorTest {
     @Test
     public void testIdRequired() {
         BeanNoIdNoAnns ent = new BeanNoIdNoAnns();
+        assertTrue(EntityIntrospector.isEntity(ent));
         try {
             EntityIntrospector.getVersion(ent);
             fail("exception (id property missing) expected");
@@ -230,6 +241,7 @@ public class EntityIntrospectorTest {
     @Test
     public void testPropAbsence() {
         BeanOnlyId ent = new BeanOnlyId();
+        assertTrue(EntityIntrospector.isEntity(ent));
         EntityIntrospector.setId(ent, "123");
         assertEquals("123", ent.getId());
         assertFalse(EntityIntrospector.supportsVersion(ent));

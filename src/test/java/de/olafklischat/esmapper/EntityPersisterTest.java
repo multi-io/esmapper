@@ -23,8 +23,6 @@ import org.junit.Test;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
-import de.olafklischat.esmapper.Entity;
-
 public class EntityPersisterTest {
 
     private static ESRunner esRunner;
@@ -47,24 +45,24 @@ public class EntityPersisterTest {
         ep = new EntityPersister(esClient.client(), "testindex");
     }
     
-    public static void assertLoaded(Entity e) {
-        assertTrue(e.isLoaded());
-        assertNotNull(e.getId());
+    public static void assertLoaded(Object e) {
+        assertTrue(EntityIntrospector.isLoaded(e));
+        assertNotNull(EntityIntrospector.getId(e));
     }
 
-    public static void assertNotLoaded(Entity e) {
-        assertFalse(e.isLoaded());
-        assertNull(e.getId());
+    public static void assertNotLoaded(Object e) {
+        assertFalse(EntityIntrospector.isLoaded(e));
+        assertNull(EntityIntrospector.getId(e));
     }
 
-    public static void assertIsStub(Entity e) {
-        assertFalse(e.isLoaded());
-        assertNotNull(e.getId());
+    public static void assertIsStub(Object e) {
+        assertFalse(EntityIntrospector.isLoaded(e));
+        assertNotNull(EntityIntrospector.getId(e));
     }
 
-    public static void assertEqualsIncludingId(Entity e1, Entity e2) {
+    public static void assertEqualsIncludingId(Object e1, Object e2) {
         assertEquals(e1, e2);
-        assertEquals(e1.getId(), e2.getId());
+        assertEquals(EntityIntrospector.getId(e1), EntityIntrospector.getId(e2));
     }
 
     @Test
@@ -437,7 +435,7 @@ public class EntityPersisterTest {
         assertFalse(it.hasNext());
 
         //read cities and persons using untyped (polymorphic) find
-        Map<String, Entity> readbackAll = ep.findById(CascadeSpec.cascade(), liv.getId(), john.getId(), paul.getId(), george.getId());
+        Map<String, Object> readbackAll = ep.findById(CascadeSpec.cascade(), liv.getId(), john.getId(), paul.getId(), george.getId());
         TestCity liv3 = (TestCity) readbackAll.get(liv.getId());
         TestPerson john3 = (TestPerson) readbackAll.get(john.getId());
         TestPerson paul3 = (TestPerson) readbackAll.get(paul.getId());
@@ -451,7 +449,7 @@ public class EntityPersisterTest {
         assertTrue(john3.getHomeTown() == liv3);
         assertTrue(george3.getNativeTown() == liv3);
 
-        Iterator<Entity> itAll = readbackAll.values().iterator();
+        Iterator<Object> itAll = readbackAll.values().iterator();
         assertTrue(liv3 == itAll.next());
         assertTrue(john3 == itAll.next());
         assertTrue(paul3 == itAll.next());
