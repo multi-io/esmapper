@@ -21,7 +21,7 @@ public class DefaultBeanMarshaller implements JsonMarshaller {
         out.beginObject();
         out.name("_class");
         out.value(src.getClass().getCanonicalName());
-        try {
+        try (JsonWriterEndObjectCloseWrapper outWrapper = new JsonWriterEndObjectCloseWrapper(out)) {
             BeanInfo bi = Introspector.getBeanInfo(src.getClass());
             for (PropertyDescriptor pd : bi.getPropertyDescriptors()) {
                 if ("class".equals(pd.getName())) { //TODO: exclude anything from j.l.Object?
@@ -37,13 +37,24 @@ public class DefaultBeanMarshaller implements JsonMarshaller {
             return true;
         } catch (Exception e) {
             throw new IllegalStateException("error introspecting " + src + ": " + e.getLocalizedMessage(), e);
-        } finally {
-            //TODO if this throws, which it may because of an I/O error or (more likely)
-            //  because writeJson above threw an exception and thus it's not legal to close the JSON object here,
-            //  then that original exception will be shadowed by the endObject() exception. We'd need something
-            //  like Java7's ARM/suppressedExceptions mechanism.
-            out.endObject();
         }
     }
 
+    /**
+     * JsonWriter wrapper to get Java7 ARM behaviour for {@link JsonWriter#endObject()}
+     */
+    private static class JsonWriterEndObjectCloseWrapper implements AutoCloseable {
+        
+        private final JsonWriter wr;
+        
+        public JsonWriterEndObjectCloseWrapper(JsonWriter wr) {
+            this.wr = wr;
+        }
+        
+        @Override
+        public void close() throws Exception {
+            wr.endObject();
+        }
+    }
+    
 }
