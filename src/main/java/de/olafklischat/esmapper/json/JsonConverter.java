@@ -31,6 +31,28 @@ import de.olafklischat.esmapper.json.stdimpl.DefaultObjectUnmarshaller;
 import de.olafklischat.esmapper.json.stdimpl.DefaultStringMarshaller;
 import de.olafklischat.esmapper.json.stdimpl.DefaultStringUnmarshaller;
 
+/**
+ * Central external API entry point for marshalling and unmarshalling JSON.
+ * The toJson() / writeJson() methods are used for marshalling (Java->JSON),
+ * the fromJson() / readJson() methods are used for unmarshalling.
+ * <p>
+ * The actual marshalling and unmarshalling work is done by {@link JsonMarshaller marshallers}
+ * and {@link JsonUnmarshaller unmarshallers}, which are registered with the JsonConverter
+ * via the register* methods. They are invoked for every subtree of the input JSON or Java object graph
+ * as it needs to be written to the output Java object or JSON stream. JsonConverter
+ * itself already registers default marshallers and unmarshallers to support all the
+ * common kinds of subtrees, e.g. primitives, objects, arrays/lists, and maps.
+ * <p>
+ * JsonConverter objects are stateless except for the registered marshallers/unmarshallers
+ * and the {@link #setAttribute(String, Object) attributes} (which aren't used
+ * by JsonConverter itself or the standard marshallers/unmarshallers). This means
+ * that you can use the same JsonConverter instance from multiple threads as long
+ * as you take care not to modify the marshaller/unmarshaller list or the attributes
+ * concurrently.
+ * 
+ * @author Olaf Klischat
+ *
+ */
 public class JsonConverter {
 
     //implement our own object mapper/unmapper on top of Gson's low-level JSON streaming API
@@ -58,11 +80,33 @@ public class JsonConverter {
         registerUnmarshaller(new DefaultNullUnmarshaller());
     }
 
-    
+    /**
+     * Register a {@link JsonMarshaller marshaller} for use with this JsonConverter.
+     * Marshallers perform all the actual marshalling work; they're called
+     * whenever a part (subtree) of the input object must be written.
+     * <p>
+     * JsonConverter itself already registers all the default marshallers (see
+     * the stdimpl subpackage) needed for marshalling all supported kinds
+     * of Java object subtrees (primitives, objects, arrays/collections and maps).
+     * 
+     * @param m
+     */
     public void registerMarshaller(JsonMarshaller m) {
         marshallers.addFirst(m);
     }
     
+    /**
+     * Register a {@link JsonUnmarshaller unmarshaller} for use with this JsonConverter.
+     * Unmarshallers perform all the actual unmarshalling work; they're called
+     * whenever a part (subtree) of the input JSON must be written to a subtree of the
+     * destination Java object graph.
+     * <p>
+     * JsonConverter itself already registers all the default unmarshallers (see
+     * the stdimpl subpackage) needed for marshalling all supported kinds
+     * of JSON subtrees (primitives, objects, arrays and maps).
+     * 
+     * @param m
+     */
     public void registerUnmarshaller(JsonUnmarshaller um) {
         unmarshallers.addFirst(um);
     }
@@ -118,7 +162,21 @@ public class JsonConverter {
         rootPath.set(src);
         writeJson(rootPath, out);
     }
-    
+
+    /**
+     * Write (marshal) sourcePath and all its referenced objects into out. Usually
+     * not called directly by outside parties, but only by marshallers and the other 
+     * write* / toJson() methods.
+     * <p>
+     * All write* / toJson() methods delegate to this one. This method calls all
+     * {@link #registerMarshaller(JsonMarshaller) registered marshallers} (in reverse
+     * order of registering) until one returns true, indicating that it wrote the subtree
+     * to the output.
+     * 
+     * @param sourcePath
+     * @param out
+     * @throws IOException
+     */
     public void writeJson(PropertyPath sourcePath, JsonWriter out) throws IOException {
         for (JsonMarshaller m : marshallers) {
             if (m.writeJson(sourcePath, out, this)) {
@@ -208,6 +266,20 @@ public class JsonConverter {
         return (T) rootPath.get();
     }
 
+    /**
+     * Read (unmarshal) source and its subtree into targetPath. Usually
+     * not called directly by outside parties, but only by unmarshallers and the other 
+     * read* / fromJson() methods.
+     * <p>
+     * All read* / fromJson() methods delegate to this one. This method calls all
+     * {@link #registerUnmarshaller(JsonUnmarshaller) registered unmarshallers} (in reverse
+     * order of registering) until one returns true, indicating that it read the subtree
+     * into targetPath.
+     * 
+     * @param source
+     * @param targetPath
+     * @throws IOException
+     */
     public void readJson(JsonElement source, PropertyPath targetPath) throws IOException {
         for (JsonUnmarshaller um : unmarshallers) {
             if (um.readJson(source, targetPath, this)) {
