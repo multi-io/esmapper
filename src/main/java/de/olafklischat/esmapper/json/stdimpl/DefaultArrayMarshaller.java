@@ -22,7 +22,9 @@ public class DefaultArrayMarshaller implements JsonMarshaller {
         int length = Array.getLength(src);
         for (int i = 0; i < length; i++) {
             PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(i, src), sourcePath);
-            converter.writeJson(elementPath, out);
+            if (converter.shouldMarshal(elementPath)) {
+                converter.writeJson(elementPath, out);
+            }
         }
         out.endArray();
         return true;

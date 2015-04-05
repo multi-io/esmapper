@@ -212,6 +212,24 @@ public class PropertyPath {
             return type;
         }
 
+        // type checking shortcuts
+        
+        public boolean isRoot() {
+            return type == Type.ROOT;
+        }
+
+        public boolean isArrayElement() {
+            return type == Type.ARRAY_ELEMENT;
+        }
+
+        public boolean isMapValue() {
+            return type == Type.MAP_VALUE;
+        }
+
+        public boolean isPropertyAccess() {
+            return type == Type.PROPERTY;
+        }
+
         /**
          * the object on which to apply the node. Must be a map if
          * type==MAP_VALUE, an array or collection if type==ARRAY_ELEMENT, or an

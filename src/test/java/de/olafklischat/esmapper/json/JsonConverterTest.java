@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -454,7 +455,54 @@ public class JsonConverterTest {
             return false;
         }
     }
+    
+    @Test
+    public void testCustomMarshallingFilter() {
+        TestProduct p = new TestProduct("iPhone", 999, new String[]{"CPU", "screen"}, null);
+        
+        JsonConverter c = new JsonConverter();
+        JsonObject json = c.toJsonElement(p).getAsJsonObject();
+        assertEquals("iPhone", json.get("name").getAsString());
+        assertEquals(999, json.get("price").getAsInt());
+        
+        JsonMarshallingFilter nameFilter = new JsonMarshallingFilter() {
+            @Override
+            public boolean shouldMarshal(PropertyPath sourcePath, JsonConverter context) {
+                return !(sourcePath.getHead().isPropertyAccess() && "name".equals(sourcePath.getHead().getPropDescriptor().getName()));
+            }
+        };
+        c.registerMarshallingFilter(nameFilter);
+        json = c.toJsonElement(p).getAsJsonObject();
+        assertNull("expecting the name property to be filtered out", json.getAsJsonObject().get("name"));
+        assertEquals(999, json.getAsJsonObject().get("price").getAsInt());
 
+        NumbersHolder ns = new NumbersHolder(20, 70, 35, new int[]{-3,5,6,72,49,58,23,123,42});
+        JsonMarshallingFilter numberFilter = new JsonMarshallingFilter() {
+            @Override
+            public boolean shouldMarshal(PropertyPath sourcePath, JsonConverter context) {
+                Object inputValue = sourcePath.get();
+                if (!(inputValue instanceof Number)) {
+                    return true;
+                }
+                int n = (int) inputValue;
+                return n < 50;
+            }
+        };
+        c = new JsonConverter();
+        c.registerMarshallingFilter(numberFilter);
+        json = c.toJsonElement(ns).getAsJsonObject();
+        assertEquals(20, json.get("x").getAsInt());
+        assertNull("int value expected to be filtered out", json.get("y"));
+        assertEquals(35, json.get("z").getAsInt());
+        Iterator<JsonElement> numbersIt = json.get("numbers").getAsJsonArray().iterator();
+        assertEquals(-3, numbersIt.next().getAsInt());
+        assertEquals(5, numbersIt.next().getAsInt());
+        assertEquals(6, numbersIt.next().getAsInt());
+        assertEquals(49, numbersIt.next().getAsInt());
+        assertEquals(23, numbersIt.next().getAsInt());
+        assertEquals(42, numbersIt.next().getAsInt());
+        assertTrue(!numbersIt.hasNext());
+    }
     
     private static Map<?, ?> newMap(Object... keysAndValues) {
         Map<Object,Object> result = new HashMap<Object, Object>();

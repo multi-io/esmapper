@@ -23,9 +23,11 @@ public class DefaultMapMarshaller implements JsonMarshaller {
         out.name("_mapClass");
         out.value(srcMap.getClass().getCanonicalName());
         for (Object key : srcMap.keySet()) {
-            out.name(key.toString());
             PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(key.toString(), src), sourcePath);
-            converter.writeJson(elementPath, out);
+            if (converter.shouldMarshal(elementPath)) {
+                out.name(key.toString());
+                converter.writeJson(elementPath, out);
+            }
         }
         out.endObject();
         return true;

@@ -2,8 +2,10 @@
 *.class
 build/
 bin/
+data/
 .project
 .classpath
 .settings
 .gradle
 .metadata
+*.swp

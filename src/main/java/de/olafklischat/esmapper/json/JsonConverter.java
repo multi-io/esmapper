@@ -16,6 +16,7 @@ import com.google.gson.internal.bind.JsonTreeWriter;
 import com.google.gson.stream.JsonReader;
 import com.google.gson.stream.JsonWriter;
 
+import de.olafklischat.esmapper.json.annotations.JsonIgnore;
 import de.olafklischat.esmapper.json.stdimpl.DefaultArrayMarshaller;
 import de.olafklischat.esmapper.json.stdimpl.DefaultArrayUnmarshaller;
 import de.olafklischat.esmapper.json.stdimpl.DefaultBeanMarshaller;
@@ -30,11 +31,12 @@ import de.olafklischat.esmapper.json.stdimpl.DefaultNumberUnmarshaller;
 import de.olafklischat.esmapper.json.stdimpl.DefaultObjectUnmarshaller;
 import de.olafklischat.esmapper.json.stdimpl.DefaultStringMarshaller;
 import de.olafklischat.esmapper.json.stdimpl.DefaultStringUnmarshaller;
+import de.olafklischat.esmapper.json.stdimpl.JsonIgnoreMarshallingFilter;
 
 /**
  * Central external API entry point for marshalling and unmarshalling JSON.
  * The toJson() / writeJson() methods are used for marshalling (Java->JSON),
- * the fromJson() / readJson() methods are used for unmarshalling.
+ * the fromJson() / readJson() methods are used for unmarshalling (JSON->Java).
  * <p>
  * The actual marshalling and unmarshalling work is done by {@link JsonMarshaller marshallers}
  * and {@link JsonUnmarshaller unmarshallers}, which are registered with the JsonConverter
@@ -57,7 +59,8 @@ public class JsonConverter {
 
     //implement our own object mapper/unmapper on top of Gson's low-level JSON streaming API
     // Gson's object mapper doesn't support everything we need
-    
+
+    private final Deque<JsonMarshallingFilter> marshallingFilters = new LinkedList<JsonMarshallingFilter>();
     private final Deque<JsonMarshaller> marshallers = new LinkedList<JsonMarshaller>();
     private final Deque<JsonUnmarshaller> unmarshallers = new LinkedList<JsonUnmarshaller>();
     
@@ -72,6 +75,7 @@ public class JsonConverter {
         registerMarshaller(new DefaultBooleanMarshaller());
         registerMarshaller(new DefaultNumberMarshaller());
         registerMarshaller(new DefaultNullMarshaller());
+        registerMarshallingFilter(new JsonIgnoreMarshallingFilter());
         registerUnmarshaller(new DefaultObjectUnmarshaller());
         registerUnmarshaller(new DefaultArrayUnmarshaller());
         registerUnmarshaller(new DefaultNumberUnmarshaller());
@@ -80,6 +84,19 @@ public class JsonConverter {
         registerUnmarshaller(new DefaultNullUnmarshaller());
     }
 
+    /**
+     * Register a {@link JsonMarshallingFilter} with this JsonConverter for
+     * use during marshalling (Java->JSON) operations.
+     * <p>
+     * JsonConverter itself registers one such filter: {@link JsonIgnoreMarshallingFilter},
+     * which filters out properties annotated with the {@link JsonIgnore} annotation.
+     * 
+     * @param filter
+     */
+    public void registerMarshallingFilter(JsonMarshallingFilter filter) {
+        marshallingFilters.add(filter);
+    }
+    
     /**
      * Register a {@link JsonMarshaller marshaller} for use with this JsonConverter.
      * Marshallers perform all the actual marshalling work; they're called
@@ -183,6 +200,28 @@ public class JsonConverter {
                 break;
             }
         }
+    }
+
+    /**
+     * Tell whether sourcePath should be marshalled, by checking against
+     * the registered JsonMarshallingFilters (see {@link #registerMarshallingFilter(JsonMarshallingFilter)}).
+     * Returns false if and only if any of those filters returns false.
+     * <p>
+     * Meant to be called by {@link JsonMarshaller marshallers} during a marshalling (Java->JSON) operation.
+     * For consistent and predictable behavior, all marshallers that have subtrees in their input that they want
+     * to pass to {@link JsonConverter#writeJson(PropertyPath, JsonWriter)} should first determine
+     * whether or not to do that by calling this method.
+     * 
+     * @param sourcePath
+     * @return
+     */
+    public boolean shouldMarshal(PropertyPath sourcePath) {
+        for (JsonMarshallingFilter f : marshallingFilters) {
+            if (!f.shouldMarshal(sourcePath, this)) {
+                return false;
+            }
+        }
+        return true;
     }
 
     

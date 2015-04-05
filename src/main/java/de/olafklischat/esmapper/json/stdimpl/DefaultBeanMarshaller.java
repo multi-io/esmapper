@@ -10,7 +10,6 @@ import com.google.gson.stream.JsonWriter;
 import de.olafklischat.esmapper.json.JsonConverter;
 import de.olafklischat.esmapper.json.JsonMarshaller;
 import de.olafklischat.esmapper.json.PropertyPath;
-import de.olafklischat.esmapper.json.annotations.JsonIgnore;
 
 public class DefaultBeanMarshaller implements JsonMarshaller {
 
@@ -28,11 +27,10 @@ public class DefaultBeanMarshaller implements JsonMarshaller {
                     continue;
                 }
                 PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(pd, src), sourcePath);
-                if (null != elementPath.getAnnotation(JsonIgnore.class)) {
-                    continue;
+                if (converter.shouldMarshal(elementPath)) {
+                    out.name(pd.getName());
+                    converter.writeJson(elementPath, out);
                 }
-                out.name(pd.getName());
-                converter.writeJson(elementPath, out);
             }
             return true;
         } catch (Exception e) {

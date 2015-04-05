@@ -25,7 +25,9 @@ public class DefaultCollectionMarshaller implements JsonMarshaller {
         //out.value(src.getClass().getCanonicalName());
         for (int i = 0; i < srcColl.size(); i++) {
             PropertyPath elementPath = new PropertyPath(new PropertyPath.Node(i, src), sourcePath);
-            converter.writeJson(elementPath, out);
+            if (converter.shouldMarshal(elementPath)) {
+                converter.writeJson(elementPath, out);
+            }
         }
         out.endArray();
         return true;
