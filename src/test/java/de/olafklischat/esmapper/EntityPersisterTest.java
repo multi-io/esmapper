@@ -12,6 +12,7 @@ import java.util.Arrays;
 import java.util.Iterator;
 import java.util.Map;
 
+import org.elasticsearch.action.get.GetResponse;
 import org.elasticsearch.common.collect.Lists;
 import org.elasticsearch.node.Node;
 import org.junit.After;
@@ -20,6 +21,7 @@ import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
@@ -39,6 +41,13 @@ public class EntityPersisterTest {
         }
         esClient = esRunner.createClient();
     }
+    
+    public static JsonElement rawGet(Class<?> cls, String id) {
+        GetResponse res = esClient.client().prepareGet("testindex", cls.getSimpleName(), id).execute().actionGet();
+        JsonParser p = new JsonParser();
+        return p.parse(res.getSourceAsString());
+    }
+    
     
     @Before
     public void setUp() throws Exception {
@@ -79,6 +88,12 @@ public class EntityPersisterTest {
         
         assertLoaded(e);
         assertEquals(new Long(1), e.getVersion());
+
+        // check that the entity (metadata) properties haven't made it into the output
+        JsonObject json = rawGet(TestPerson.class, e.getId()).getAsJsonObject();
+        assertFalse(json.has("id"));
+        assertFalse(json.has("version"));
+        assertFalse(json.has("loaded"));
         
         TestPerson e2 = ep.findById(e.getId(), TestPerson.class);
         assertEquals(42, e2.getAge());

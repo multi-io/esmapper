@@ -28,6 +28,7 @@ import com.google.gson.stream.JsonWriter;
 
 import de.olafklischat.esmapper.json.JsonConverter;
 import de.olafklischat.esmapper.json.JsonMarshaller;
+import de.olafklischat.esmapper.json.JsonMarshallingFilter;
 import de.olafklischat.esmapper.json.JsonUnmarshaller;
 import de.olafklischat.esmapper.json.PropertyPath;
 
@@ -221,7 +222,7 @@ public class EntityPersister {
         }
     }
 
-    protected class Persister implements JsonMarshaller {
+    protected class Persister implements JsonMarshaller, JsonMarshallingFilter {
         private boolean subObjectsIgnoreVersion = false;
         private final LinkedList<PropertyPath> entitiesStack = new LinkedList<PropertyPath>();
         private final Set<Object> seenEntities = new IdentityHashSet<Object>();  //TODO: hash by ID rather than identity?
@@ -265,6 +266,7 @@ public class EntityPersister {
             irb.setType(entity.getClass().getSimpleName());
             JsonConverter jsc = new JsonConverter();
             jsc.registerMarshaller(this);
+            jsc.registerMarshallingFilter(this);
             jsc.setAttribute("cascadeSpec", cascadeSpec);
             String json = jsc.toJson(entity);
             irb.setSource(json);
@@ -338,6 +340,16 @@ public class EntityPersister {
             }
 
             return true;
+        }
+        
+        @Override
+        public boolean shouldMarshal(PropertyPath sourcePath,
+                JsonConverter context) {
+            // avoid marshalling entity metadata properties (id, version, loaded)
+            Object bo = sourcePath.getBaseObject();
+            return !(EntityIntrospector.isEntity(bo) &&
+                     sourcePath.getHead().isPropertyAccess() &&
+                     EntityIntrospector.isMetadataProperty(bo, sourcePath.getHead().getPropDescriptor().getName()));
         }
         
         private void writeReference(JsonWriter out, Object e) throws IOException {

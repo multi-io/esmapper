@@ -65,6 +65,12 @@ public class EntityIntrospector {
                 throw new IllegalStateException("error introspecting " + cl + ": " + e.getLocalizedMessage(), e);
             }
         }
+        
+        public boolean isAccessor(String name) {
+            return name.equals(idAccessor.getName()) ||
+                    (versionAccessor != null && name.equals(versionAccessor.getName())) ||
+                    (loadedAccessor != null && name.equals(loadedAccessor.getName()));
+        }
     }
     
     private static class Accessor {
@@ -80,6 +86,9 @@ public class EntityIntrospector {
         }
         public Class<?> getType() {
             return pd.getPropertyType();
+        }
+        public String getName() {
+            return pd.getName();
         }
         public Object get(Object entity) {
             try {
@@ -168,6 +177,10 @@ public class EntityIntrospector {
      */
     public static void setLoaded(Object entity, boolean isLoaded) {
         getAccessors(entity).loadedAccessor.set(entity, isLoaded);
+    }
+    
+    public static boolean isMetadataProperty(Object entity, String propName) {
+        return getAccessors(entity).isAccessor(propName);
     }
     
 }
